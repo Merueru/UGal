@@ -1,0 +1,1805 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UrGal</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📕</text></svg>">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        darkBg: '#1f2122',
+                        darkCard: '#2e3033',
+                        nRed: '#ed2553',
+                        nRedHover: '#c41d42',
+                        tagBg: '#404040'
+                    },
+                    aspectRatio: { 'a4': '1 / 1.414' }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #1f2122; color: #f3f4f6; font-family: sans-serif; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2122; }
+        ::-webkit-scrollbar-thumb { background: #ed2553; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #c41d42; }
+
+        .hide { display: none !important; }
+        .gallery-card:hover .cover-img { transform: scale(1.05); }
+        .cover-img { transition: transform 0.3s ease; }
+
+        /* Drag & Drop Upload zones */
+        .drag-over { border-color: #ed2553 !important; background-color: rgba(237, 37, 83, 0.1) !important; }
+
+        /* Reader Modes */
+        .reader-img-fit { max-width: 100%; max-height: calc(100vh - 140px); object-fit: contain; }
+        .reader-img-original { max-width: none; width: auto; height: auto; }
+
+        /* Translation Layer */
+        #translationLayer.edit-mode { cursor: crosshair; }
+        
+        /* Translation Box Styles */
+        .trans-box {
+            position: absolute;
+            border-radius: 6px;
+            padding: 8px; /* Safe padding for dragging */
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            resize: both;
+            overflow: hidden;
+            min-width: 60px; min-height: 40px;
+            z-index: 50;
+            display: flex; flex-direction: column;
+        }
+        .trans-box:not(.view-only) { border: 1px dashed rgba(237, 37, 83, 0.5); cursor: move; }
+        .trans-box:not(.view-only):hover { border: 1px solid #ed2553; }
+        .trans-box.selected { border: 2px solid #ed2553 !important; outline: 2px solid white; z-index: 55; }
+        
+        .trans-box.view-only {
+            padding: 4px 8px; resize: none; border: none;
+            pointer-events: none;
+        }
+
+        /* Background & Color Modes */
+        .bg-white-mode { background: rgba(255, 255, 255, 0.9); }
+        .bg-black-mode { background: rgba(0, 0, 0, 0.85); }
+        .bg-clear-mode { background: transparent; text-shadow: 1px 1px 2px black, -1px -1px 2px black; }
+        .text-dark { color: #111; }
+        .text-light { color: #fff; }
+
+        .trans-box-delete {
+            position: absolute; top: 0; right: 4px;
+            color: red; cursor: pointer; font-size: 14px; font-weight: bold; z-index: 51;
+            background: white; border-radius: 50%; width: 18px; height: 18px; text-align: center; line-height: 18px;
+            display: none;
+        }
+        .trans-box:not(.view-only):hover .trans-box-delete { display: block; }
+
+        .trans-content {
+            width: 100%; flex-grow: 1; outline: none; border: none; background: transparent;
+            resize: none; font-family: inherit; line-height: 1.4;
+            cursor: text; /* Switch cursor back to text inside textarea */
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Navbar -->
+    <nav class="bg-darkCard shadow-md border-b border-gray-700 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
+            <div class="flex items-center gap-6">
+                <a href="#" onclick="UI.navigate('home')" class="text-xl font-bold flex items-center gap-2">
+                    <span class="text-nRed"><i class="fa-solid fa-book-open"></i> UrGal</span>
+                     <p class="hidden sm:block text-gray-400 text-sm">V 0.2.2 beta</p>
+                </a>
+                <div class="hidden md:flex gap-4 text-sm font-semibold text-gray-300">
+                    <a href="#" onclick="UI.navigate('tags')" class="hover:text-nRed transition" data-i18n="tags">แท็ก</a>
+                    <a href="#" onclick="UI.navigate('artists')" class="hover:text-nRed transition" data-i18n="artists">ศิลปิน</a>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-4">
+                <select id="langSelect" onchange="UI.changeLang(this.value)" class="bg-darkBg text-white border border-gray-600 rounded text-xs px-2 py-1 outline-none focus:border-nRed">
+                    <option value="th">🇹🇭 TH</option>
+                    <option value="en">🇬🇧 EN</option>
+                    <option value="cn">🇨🇳 CN</option>
+                    <option value="jp">🇯🇵 JP</option>
+                </select>
+
+                <!-- Global Search/Random (visible in Home, Tags, Artists, User) -->
+                <div id="navSearchZone" class="hidden md:flex relative items-center gap-2">
+                    <div class="relative group">
+                        <input type="text" id="searchInput" data-i18n-placeholder="search_placeholder" placeholder="ค้นหา..." class="bg-darkBg text-white px-4 py-1.5 rounded-full border border-gray-600 focus:border-nRed focus:outline-none w-48 text-sm transition-all" onkeyup="UI.handleSearch(event)">
+                        <i class="fa-solid fa-search absolute right-3 top-2 text-gray-400"></i>
+                    </div>
+                    <button onclick="UI.handleRandom()" class="bg-gray-700 hover:bg-nRed px-3 py-1.5 rounded-full text-white transition" data-i18n-title="random_title" title="สุ่มเรื่องจากรายการนี้">
+                        <i class="fa-solid fa-dice"></i>
+                    </button>
+                </div>
+                
+                <div class="hidden md:flex items-center gap-2 ml-2 border-l border-gray-600 pl-4">
+                    <button onclick="DataManager.exportAll()" class="bg-gray-700 hover:bg-green-600 px-3 py-1.5 rounded-full text-white transition" data-i18n-title="export_title" title="ส่งออกข้อมูลทั้งหมด (Backup)">
+                        <i class="fa-solid fa-file-export"></i>
+                    </button>
+                    <button onclick="document.getElementById('importInput').click()" class="bg-gray-700 hover:bg-blue-500 px-3 py-1.5 rounded-full text-white transition" data-i18n-title="import_title" title="นำเข้าข้อมูล (Restore)">
+                        <i class="fa-solid fa-file-import"></i>
+                    </button>
+                    <input type="file" id="importInput" class="hidden" accept=".json" onchange="DataManager.importData(event)">
+                </div>
+
+                <button onclick="UI.navigate('upload')" class="bg-nRed hover:bg-nRedHover text-white px-4 py-1.5 rounded text-sm font-semibold transition flex items-center gap-2">
+                    <i class="fa-solid fa-upload"></i> <span class="hidden sm:inline" data-i18n="upload">อัปโหลด</span>
+                </button>
+                <div onclick="UI.navigate('user')" class="w-8 h-8 bg-gray-600 hover:bg-nRed transition rounded-full flex items-center justify-center cursor-pointer text-white" data-i18n-title="profile_title" title="โปรไฟล์ & รายการโปรด">
+                    <i class="fa-solid fa-user text-sm"></i>
+                </div>
+                <button onclick="document.getElementById('settingsModal').classList.remove('hide')" class="text-gray-400 hover:text-white transition" title="ตั้งค่า / Settings"><i class="fa-solid fa-gear"></i></button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-grow p-4 max-w-7xl mx-auto w-full relative">
+        
+        <!-- ================= SHARED GRID VIEW (Home, Filtered, User) ================= -->
+        <div id="view-grid" class="view hide">
+            <div class="flex justify-between items-end mb-6 border-b border-gray-700 pb-2">
+                <div class="flex items-center gap-3">
+                    <h2 id="gridTitle" class="text-2xl font-bold">อัปเดตล่าสุด</h2>
+                    <button onclick="Grid.toggleEditMode()" id="btnGridEdit" class="text-gray-400 hover:text-white transition text-sm pb-1" title="แก้ไข / ลบ"><i class="fa-solid fa-pen"></i></button>
+                </div>
+                <div class="flex items-center gap-3">
+                    <select id="sortGrid" onchange="Grid.handleSortChange(this.value)" class="bg-darkBg text-white border border-gray-600 rounded text-xs px-2 py-1 outline-none focus:border-nRed">
+                        <option value="newest" data-i18n="sort_newest">ใหม่ - เก่า</option>
+                        <option value="oldest" data-i18n="sort_oldest">เก่า - ใหม่</option>
+                        <option value="most_pages" data-i18n="sort_most_pages">หน้าเยอะ</option>
+                        <option value="least_pages" data-i18n="sort_least_pages">หน้าน้อย</option>
+                        <option value="az" data-i18n="sort_az">A - Z</option>
+                        <option value="za" data-i18n="sort_za">Z - A</option>
+                    </select>
+                    <span id="gridCount" class="text-gray-400 text-sm">0 รายการ</span>
+                </div>
+            </div>
+            <div id="gallery-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"></div>
+            <div id="grid-pagination" class="flex justify-center gap-2 mt-8 flex-wrap"></div>
+            <div id="grid-empty" class="text-center text-gray-500 mt-20 hide">
+                <i class="fa-solid fa-folder-open text-6xl mb-4"></i>
+                <p id="grid-empty-text">ไม่พบข้อมูล</p>
+            </div>
+        </div>
+
+        <!-- ================= LIST VIEW (Tags, Artists) ================= -->
+        <div id="view-list" class="view hide">
+            <h2 id="listTitle" class="text-2xl font-bold mb-6 border-b border-gray-700 pb-2">รายการ</h2>
+            <div id="list-container" class="flex flex-wrap gap-3"></div>
+        </div>
+
+        <!-- ================= UPLOAD VIEW ================= -->
+        <div id="view-upload" class="view hide max-w-4xl mx-auto">
+            <div class="bg-darkCard p-6 rounded-lg shadow-lg">
+                <h2 id="uploadHeader" class="text-2xl font-bold mb-6 text-nRed"><i class="fa-solid fa-cloud-arrow-up"></i> <span data-i18n="upload_header_new">อัปโหลดเรื่องใหม่</span></h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="col-span-1">
+                        <label class="block text-sm font-medium text-gray-300 mb-2" data-i18n="cover_label">หน้าปก (Cover) - ลากวางได้</label>
+                        <div id="dropZoneCover" class="aspect-a4 bg-darkBg border-2 border-dashed border-gray-600 rounded flex flex-col items-center justify-center relative overflow-hidden group cursor-pointer transition" onclick="document.getElementById('coverInput').click()">
+                            <img id="coverPreview" src="" class="absolute inset-0 w-full h-full object-cover hide">
+                            <div id="coverPlaceholder" class="text-center text-gray-500 pointer-events-none">
+                                <i class="fa-solid fa-image text-4xl mb-2 group-hover:text-nRed transition"></i>
+                                <p class="text-sm" data-i18n="cover_placeholder">คลิกหรือลากรูปมาวาง</p>
+                            </div>
+                        </div>
+                        <input type="file" id="coverInput" accept="image/*" class="hidden" onchange="UploadManager.handleCoverSelect(event)">
+                    </div>
+                    
+                    <div class="col-span-1 md:col-span-2 space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-1" data-i18n="title_label">ชื่อเรื่อง (Title)</label>
+                            <input type="text" id="upTitle" data-i18n-placeholder="title_placeholder" class="w-full bg-darkBg border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-nRed" placeholder="ใส่ชื่อเรื่อง...">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-1" data-i18n="tags_label">แท็ก (Tags) <span class="text-xs text-gray-500">- คั่นด้วยลูกน้ำ (,)</span></label>
+                            <input type="text" id="upTags" data-i18n-placeholder="tags_placeholder" class="w-full bg-darkBg border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-nRed" placeholder="romance, school life">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-1" data-i18n="artists_label">ศิลปิน (Artists) <span class="text-xs text-gray-500">- คั่นด้วยลูกน้ำ (,)</span></label>
+                            <input type="text" id="upArtists" data-i18n-placeholder="artists_placeholder" class="w-full bg-darkBg border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-nRed" placeholder="artist_name">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-8 pt-6 border-t border-gray-700">
+                    <div class="flex justify-between items-center mb-4">
+                        <label class="block text-lg font-medium text-gray-300" data-i18n="pages_label">หน้าทั้งหมด (Pages) - ลากวางได้หลายรูป</label>
+                        <button onclick="document.getElementById('pagesInput').click()" class="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm flex items-center gap-2">
+                            <i class="fa-solid fa-plus"></i> <span data-i18n="add_image_btn">เพิ่มรูปภาพ</span>
+                        </button>
+                        <input type="file" id="pagesInput" accept="image/*" multiple class="hidden" onchange="UploadManager.handlePagesSelect(event)">
+                    </div>
+
+                    <div id="dropZonePages" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 bg-darkBg p-4 rounded min-h-[200px] border-2 border-dashed border-gray-700 transition">
+                        <!-- Items -->
+                    </div>
+                </div>
+
+                <div class="mt-8 flex justify-end gap-3">
+                    <button onclick="UI.navigate('home')" class="px-6 py-2 rounded bg-gray-700 hover:bg-gray-600 transition" data-i18n="cancel_btn">ยกเลิก</button>
+                    <button onclick="UploadManager.saveGallery()" class="px-6 py-2 rounded bg-nRed hover:bg-nRedHover font-bold shadow-lg shadow-red-900/50 transition">
+                        <i class="fa-solid fa-save"></i> <span data-i18n="save_btn">บันทึกและเผยแพร่</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= GALLERY DETAIL VIEW ================= -->
+        <div id="view-detail" class="view hide max-w-6xl mx-auto">
+            <div class="flex flex-col md:flex-row gap-8 bg-darkCard p-6 rounded-lg mb-6">
+                <div class="w-full md:w-1/3 max-w-sm mx-auto">
+                    <img id="detCover" src="" class="w-full rounded shadow-lg">
+                </div>
+                <div class="w-full md:w-2/3">
+                    <div class="flex justify-between items-start">
+                        <h1 id="detTitle" class="text-3xl font-bold mb-4">Title Here</h1>
+                        <button id="btnFavorite" onclick="Detail.toggleFavorite()" class="text-2xl text-gray-500 hover:text-nRed transition" title="บันทึกรายการโปรด">
+                            <i class="fa-regular fa-heart"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <span class="text-gray-400 text-sm font-semibold w-20 inline-block">Artists:</span>
+                        <div id="detArtists" class="inline-flex flex-wrap gap-2"></div>
+                    </div>
+                    <div class="mb-6">
+                        <span class="text-gray-400 text-sm font-semibold w-20 inline-block">Tags:</span>
+                        <div id="detTags" class="inline-flex flex-wrap gap-2"></div>
+                    </div>
+                    
+                    <div class="flex items-center gap-4 text-gray-400 text-sm mb-6">
+                        <span><i class="fa-solid fa-file-lines"></i> <span id="detPageCount">0</span> pages</span>
+                        <span><i class="fa-solid fa-clock"></i> <span id="detDate"></span></span>
+                    </div>
+
+                    <div class="flex flex-wrap gap-3" id="detActionButtons">
+                        <button onclick="Reader.startReading()" class="bg-nRed hover:bg-nRedHover px-8 py-2.5 rounded font-bold text-lg shadow-lg flex items-center gap-2">
+                            <i class="fa-solid fa-book-open-reader"></i> อ่านเลย
+                        </button>
+                        <button onclick="UI.navigate('edit', App.currentGalleryId)" class="bg-blue-600 hover:bg-blue-700 px-4 py-2.5 rounded font-bold text-white transition" title="แก้ไข">
+                            <i class="fa-solid fa-wrench"></i>
+                        </button>
+                        <button onclick="DB.deleteGallery(App.currentGalleryId)" class="bg-gray-700 hover:bg-red-900 px-4 py-2.5 rounded font-bold text-white transition" title="ลบเรื่องนี้">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-darkCard p-6 rounded-lg">
+                <h3 class="text-xl font-bold mb-4 border-b border-gray-700 pb-2">พรีวิว (Pages)</h3>
+                <div id="detPagesGrid" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3"></div>
+            </div>
+        </div>
+
+        <!-- ================= READER VIEW ================= -->
+        <div id="view-reader" class="view hide flex flex-col items-center relative">
+            
+            <!-- Top Controls -->
+            <div class="w-full max-w-5xl flex justify-between items-center bg-darkCard p-3 rounded shadow mb-4 sticky top-16 z-30">
+                <button onclick="Reader.handleBackBtn()" class="text-gray-400 hover:text-white px-2"><i class="fa-solid fa-arrow-left"></i> กลับ</button>
+                
+                <div class="flex items-center gap-4 text-sm font-bold">
+                    <button onclick="Reader.prevPage()" class="p-2 hover:text-nRed"><i class="fa-solid fa-chevron-left"></i></button>
+                    <span><span data-i18n="page_label">หน้า</span> <span id="readerCurrentPage">1</span> / <span id="readerTotalPages">1</span></span>
+                    <button onclick="Reader.nextPage()" class="p-2 hover:text-nRed"><i class="fa-solid fa-chevron-right"></i></button>
+                    <div class="w-px h-4 bg-gray-600 mx-2"></div>
+                    <button onclick="Reader.randomPage()" class="p-2 hover:text-nRed" data-i18n-title="random_page_title" title="สุ่มหน้า"><i class="fa-solid fa-dice"></i></button>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <label class="flex items-center cursor-pointer gap-2 text-sm">
+                        <input type="checkbox" id="showTransToggle" checked class="form-checkbox text-nRed rounded bg-darkBg border-gray-600 focus:ring-nRed h-4 w-4" onchange="Reader.toggleShowTranslations()">
+                        <span class="text-gray-300" data-i18n="show_trans">แสดงคำแปล</span>
+                    </label>
+                    <button onclick="Reader.toggleEditMode()" id="btnEditTrans" class="bg-yellow-600 hover:bg-yellow-500 px-3 py-1 rounded text-sm font-bold transition flex items-center gap-1">
+                        <i class="fa-solid fa-plus"></i> <span data-i18n="add_trans">เพิ่มคำแปล</span>
+                    </button>
+                    <!-- Settings Dropdown -->
+                    <div class="relative">
+                        <button onclick="document.getElementById('readerSettings').classList.toggle('hide')" class="text-gray-400 hover:text-white p-2"><i class="fa-solid fa-gear"></i></button>
+                        <div id="readerSettings" class="hide absolute right-0 mt-2 w-48 bg-darkCard border border-gray-600 rounded shadow-xl p-2 z-50 text-sm">
+                            <div class="text-gray-400 mb-2 font-semibold px-2" data-i18n="settings_title">ขนาดภาพ</div>
+                            <label class="flex items-center gap-2 p-2 hover:bg-gray-700 rounded cursor-pointer">
+                                <input type="radio" name="imgFit" value="fit" checked onchange="Reader.updateImgFit('fit')"> <span data-i18n="fit_window">พอดีหน้าต่าง (Fit Window)</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-2 hover:bg-gray-700 rounded cursor-pointer">
+                                <input type="radio" name="imgFit" value="original" onchange="Reader.updateImgFit('original')"> <span data-i18n="original_size">ขนาดดั้งเดิม (Original)</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Edit Mode Banner & Translation Format Toolbar -->
+            <div id="editModeBanner" class="hide w-full max-w-5xl bg-yellow-600 text-white p-2 rounded mb-4 shadow flex flex-col sm:flex-row justify-between items-center gap-2 sticky top-32 z-40">
+                <div class="text-sm">
+                    <i class="fa-solid fa-pen-to-square"></i> <span data-i18n="edit_banner"><b>โหมดแก้ไข:</b> คลิกรูปเพื่อเพิ่มกล่อง, คลิกขอบกล่องเพื่อลาก</span>
+                    <span id="unsavedWarning" class="text-red-900 font-bold ml-2 hide"><i class="fa-solid fa-triangle-exclamation"></i> <span data-i18n="unsaved_warning">ยังไม่ได้บันทึก!</span></span>
+                </div>
+                
+                <!-- Format Toolbar (Shows when a box is selected) -->
+                <div id="transToolbar" class="flex items-center gap-2 bg-yellow-700 p-1 rounded opacity-50 pointer-events-none transition-opacity">
+                    <button onclick="Reader.changeFormat('size', -2)" class="px-2 hover:bg-yellow-800 rounded" title="ลดขนาดตัวอักษร"><i class="fa-solid fa-a text-xs"></i></button>
+                    <span id="tbSize" class="w-6 text-center text-xs">14</span>
+                    <button onclick="Reader.changeFormat('size', 2)" class="px-2 hover:bg-yellow-800 rounded" title="เพิ่มขนาดตัวอักษร"><i class="fa-solid fa-a text-lg"></i></button>
+                    <div class="w-px h-4 bg-yellow-800 mx-1"></div>
+                    <button onclick="Reader.changeFormat('bg', 'white')" class="w-5 h-5 rounded-full bg-white border border-gray-400" title="พื้นขาว"></button>
+                    <button onclick="Reader.changeFormat('bg', 'black')" class="w-5 h-5 rounded-full bg-black border border-gray-400" title="พื้นดำ"></button>
+                    <button onclick="Reader.changeFormat('bg', 'clear')" class="w-5 h-5 rounded-full bg-transparent border border-gray-400 relative overflow-hidden" title="พื้นใส">
+                        <div class="absolute inset-0 bg-[url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAOklEQVQYV2N89erVfwY0ICYmBiuE8UlgE2QVEI1E2QQ1EQSIsgmIJiI0ES3B1BfUfEA+gE8/UCQBAgCG6x2578y9vAAAAABJRU5ErkJggg==')]"></div>
+                    </button>
+                    <div class="w-px h-4 bg-yellow-800 mx-1"></div>
+                    <button onclick="Reader.changeFormat('color', 'black')" class="px-2 hover:bg-yellow-800 rounded font-bold text-black text-shadow-none" title="ตัวอักษรดำ">T</button>
+                    <button onclick="Reader.changeFormat('color', 'white')" class="px-2 hover:bg-yellow-800 rounded font-bold text-white text-shadow-black" title="ตัวอักษรขาว">T</button>
+                </div>
+
+                <button onclick="Reader.saveTranslations()" class="bg-white text-yellow-800 px-4 py-1.5 rounded text-sm font-bold hover:bg-gray-200 shadow" data-i18n="save_page_btn">บันทึกหน้านี้</button>
+            </div>
+
+            <!-- Image Container -->
+            <div id="readerImageContainer" class="relative max-w-5xl w-full flex justify-center bg-black shadow-xl rounded overflow-hidden select-none min-h-[50vh]">
+                <img id="readerImage" src="" class="reader-img-fit block" draggable="false">
+                
+                <!-- Translations Layer (Overlay exact size of image via JS) -->
+                <div id="translationLayer" class="absolute inset-0 overflow-hidden" onclick="Reader.handleLayerClick(event)">
+                    <!-- Translation boxes generated here -->
+                </div>
+            </div>
+            
+            <div class="mt-4 text-gray-500 text-sm mb-10">
+                <span data-i18n="keyboard_hint">ใช้ปุ่มลูกศร <kbd class="bg-gray-800 px-1 rounded">←</kbd> <kbd class="bg-gray-800 px-1 rounded">→</kbd> บนคีย์บอร์ดเพื่อเปลี่ยนหน้า</span>
+            </div>
+        </div>
+
+        <!-- ================= SETTINGS MODAL ================= -->
+        <div id="settingsModal" class="fixed inset-0 bg-black/80 z-50 hide flex items-center justify-center p-4 backdrop-blur-sm">
+            <div class="bg-darkCard p-6 rounded-lg shadow-lg max-w-md w-full border border-gray-700">
+                <h2 class="text-xl font-bold mb-4 text-white" data-i18n="settingmodal"><i class="fa-solid fa-gear"></i> Settings</h2>
+                <div class="mb-6">
+                    <label class="block text-sm text-gray-400 mb-2" data-i18n="local_backup_folder">Local Backup Folder</label>
+                    <button onclick="FileSystemManager.selectFolder()" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-3 rounded w-full flex items-center justify-center gap-2 transition border border-gray-600">
+                        <i class="fa-solid fa-folder-open text-yellow-500" ></i> <span id="folderName" data-i18n="select_folder">Select Folder...</span>
+                    </button>
+                    <div class="flex justify-between items-start mt-2">
+                        <p class="text-xs text-gray-500" data-i18n="backup_info">Data will be saved as .json files in this folder automatically.</p>
+                        <button onclick="FileSystemManager.disconnectFolder()" class="text-xs text-red-400 hover:text-red-300 underline whitespace-nowrap ml-2" data-i18n="disconnect_folder">Disconnect</button>
+                    </div>
+                </div>
+                <button onclick="FileSystemManager.restoreFromLocal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded w-full mb-4 font-bold transition"><i class="fa-solid fa-rotate-left"></i> <span data-i18n="restore_local">Restore from Local Folder</span></button>
+                <div class="flex justify-end border-t border-gray-700 pt-4">
+                    <button onclick="document.getElementById('settingsModal').classList.add('hide')" class="text-gray-300 hover:text-white px-4 py-2" data-i18n="close_btn_settings_modal">Close</button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // ================= I18N SYSTEM =================
+        const I18N = {
+            th: {
+                tags: "แท็ก", artists: "ศิลปิน",
+                search_placeholder: "ค้นหา...", random_title: "สุ่มเรื่องจากรายการนี้",
+                export_title: "ส่งออกข้อมูลทั้งหมด (Backup)", import_title: "นำเข้าข้อมูล (Restore)",
+                upload: "อัปโหลด", profile_title: "โปรไฟล์ & รายการโปรด",
+                latest_updates: "อัปเดตล่าสุด", favorites: '<i class="fa-solid fa-heart text-nRed"></i> รายการโปรด',
+                items_count: "รายการ", no_data: "ไม่พบข้อมูล",
+                no_data_search: 'ไม่พบข้อมูลที่ตรงกับ "{q}"', no_data_cat: 'ยังไม่มีข้อมูลในหมวดหมู่นี้',
+                read_progress: 'อ่านถึง {current}/{total}',
+                sort_newest: "ใหม่ - เก่า", sort_oldest: "เก่า - ใหม่",
+                sort_most_pages: "หน้าเยอะ", sort_least_pages: "หน้าน้อย", sort_az: "A - Z", sort_za: "Z - A",
+                list_header: "รายการ", all_tags: '<i class="fa-solid fa-tags"></i> แท็กทั้งหมด', all_artists: '<i class="fa-solid fa-users"></i> ศิลปินทั้งหมด',
+                no_data_simple: "ยังไม่มีข้อมูล",
+                upload_header_new: "อัปโหลดเรื่องใหม่", upload_header_edit: "แก้ไขข้อมูล",
+                cover_label: "หน้าปก (Cover) - ลากวางได้", cover_placeholder: "คลิกหรือลากรูปมาวาง",
+                title_label: "ชื่อเรื่อง (Title)", title_placeholder: "ใส่ชื่อเรื่อง...",
+                tags_label: "แท็ก (Tags) <span class='text-xs text-gray-500'>- คั่นด้วยลูกน้ำ (,)</span>", tags_placeholder: "romance, school life",
+                artists_label: "ศิลปิน (Artists) <span class='text-xs text-gray-500'>- คั่นด้วยลูกน้ำ (,)</span>", artists_placeholder: "artist_name",
+                pages_label: "หน้าทั้งหมด (Pages) - ลากวางได้หลายรูป", add_image_btn: "เพิ่มรูปภาพ",
+                pages_placeholder: "ลากรูปภาพมาวางที่นี่ หรือกดเพิ่มรูปภาพ", cancel_btn: "ยกเลิก", save_btn: "บันทึกและเผยแพร่",
+                no_tags: "ไม่มีแท็ก", no_artists: "ไม่ระบุ", pages_count: "หน้า",
+                read_now: "อ่านเลย", read_continue: "อ่านต่อ (หน้า {page})", random_read_title: "สุ่มหน้าอ่าน",
+                clear_bookmark_title: "เคลียร์บุ๊กมาร์ก", delete_bookmark: "ลบที่คั่น",
+                export_this_title: "ส่งออกเรื่องนี้", edit_title: "แก้ไข", delete_title: "ลบเรื่องนี้",
+                preview_header: "พรีวิว (Pages)", back_btn: "กลับ", page_label: "หน้า", random_page_title: "สุ่มหน้า",
+                show_trans: "แสดงคำแปล", add_trans: "เพิ่มคำแปล", close_edit: "ปิดโหมดแก้",
+                settings_title: "ขนาดภาพ", fit_window: "พอดีหน้าต่าง (Fit Window)", original_size: "ขนาดดั้งเดิม (Original)",
+                edit_banner: "<b>โหมดแก้ไข:</b> คลิกรูปเพื่อเพิ่มกล่อง, คลิกขอบกล่องเพื่อลาก", unsaved_warning: "ยังไม่ได้บันทึก!",
+                save_page_btn: "บันทึกหน้านี้", saved_msg: "บันทึกแล้ว!", keyboard_hint: "ใช้ปุ่มลูกศร <kbd class='bg-gray-800 px-1 rounded'>←</kbd> <kbd class='bg-gray-800 px-1 rounded'>→</kbd> บนคีย์บอร์ดเพื่อเปลี่ยนหน้า",
+                confirm_unsaved: "ยังไม่ได้บันทึกคำแปล ต้องการทิ้งการเปลี่ยนแปลงหรือไม่?", confirm_delete: "คุณแน่ใจหรือไม่ว่าต้องการลบเรื่องนี้? รูปภาพทั้งหมดจะถูกลบด้วย",
+                confirm_delete_bookmark: "ต้องการลบบุ๊กมาร์ก (ประวัติการอ่าน) ของเรื่องนี้ใช่หรือไม่?", confirm_export_all: "ต้องการส่งออกข้อมูลทั้งหมด (ทุกเรื่อง, บุ๊กมาร์ก, รายการโปรด)? ไฟล์อาจมีขนาดใหญ่",
+                alert_no_random: "ไม่มีเรื่องให้สุ่มในหน้านี้", alert_no_cover: "กรุณาเลือกหน้าปกหรืออัปโหลดรูปภาพอย่างน้อย 1 รูป",
+                alert_save_error: "เกิดข้อผิดพลาดในการบันทึก: ", alert_edit_success: "แก้ไขเรียบร้อย!", alert_save_success: "บันทึกสำเร็จ!",
+                alert_import_success: "นำเข้า {count} รายการสำเร็จ", alert_file_error: "รูปแบบไฟล์ไม่ถูกต้อง", alert_import_error: "ไฟล์เสียหายหรือผิดพลาด: ", alert_no_pages: "ไม่มีรูปภาพให้อ่าน",
+                settingmodal: "ตั้งค่า", local_backup_folder: "โฟลเดอร์สำรองข้อมูล", select_folder: "เลือกโฟลเดอร์...", backup_info: "ข้อมูลจะถูกบันทึกเป็นไฟล์ .json ในโฟลเดอร์นี้โดยอัตโนมัติ", restore_local: "กู้คืนจากโฟลเดอร์ในเครื่อง", close_btn_settings_modal: "ปิด", disconnect_folder: "ยกเลิกการสำรองข้อมูล"
+            },
+            en: {
+                tags: "Tags", artists: "Artists",
+                search_placeholder: "Search...", random_title: "Random from list",
+                export_title: "Export All (Backup)", import_title: "Import Data (Restore)",
+                upload: "Upload", profile_title: "Profile & Favorites",
+                latest_updates: "Latest Updates", favorites: '<i class="fa-solid fa-heart text-nRed"></i> Favorites',
+                items_count: "Items", no_data: "No Data",
+                no_data_search: 'No results for "{q}"', no_data_cat: 'No data in this category',
+                read_progress: 'Read {current}/{total}',
+                sort_newest: "Newest - Oldest", sort_oldest: "Oldest - Newest",
+                sort_most_pages: "Most Pages", sort_least_pages: "Least Pages", sort_az: "A - Z", sort_za: "Z - A",
+                list_header: "List", all_tags: '<i class="fa-solid fa-tags"></i> All Tags', all_artists: '<i class="fa-solid fa-users"></i> All Artists',
+                no_data_simple: "No data available",
+                upload_header_new: "Upload New", upload_header_edit: "Edit Info",
+                cover_label: "Cover Image - Drag & Drop", cover_placeholder: "Click or Drag image here",
+                title_label: "Title", title_placeholder: "Enter title...",
+                tags_label: "Tags <span class='text-xs text-gray-500'>- comma separated</span>", tags_placeholder: "romance, school life",
+                artists_label: "Artists <span class='text-xs text-gray-500'>- comma separated</span>", artists_placeholder: "artist_name",
+                pages_label: "Pages - Drag & Drop multiple", add_image_btn: "Add Images",
+                pages_placeholder: "Drag images here or click Add Images", cancel_btn: "Cancel", save_btn: "Save & Publish",
+                no_tags: "No Tags", no_artists: "Unknown", pages_count: "pages",
+                read_now: "Read Now", read_continue: "Continue (Page {page})", random_read_title: "Random Page",
+                clear_bookmark_title: "Clear Bookmark", delete_bookmark: "Remove Bookmark",
+                export_this_title: "Export this", edit_title: "Edit", delete_title: "Delete",
+                preview_header: "Preview (Pages)", back_btn: "Back", page_label: "Page", random_page_title: "Random Page",
+                show_trans: "Show Translations", add_trans: "Add Translation", close_edit: "Exit Edit Mode",
+                settings_title: "Image Fit", fit_window: "Fit Window", original_size: "Original Size",
+                edit_banner: "<b>Edit Mode:</b> Click image to add box, click edge to drag", unsaved_warning: "Unsaved Changes!",
+                save_page_btn: "Save Page", saved_msg: "Saved!", keyboard_hint: "Use <kbd class='bg-gray-800 px-1 rounded'>←</kbd> <kbd class='bg-gray-800 px-1 rounded'>→</kbd> keys to navigate",
+                confirm_unsaved: "Unsaved translations. Discard changes?", confirm_delete: "Are you sure you want to delete this? All images will be lost.",
+                confirm_delete_bookmark: "Delete bookmark (reading history) for this item?", confirm_export_all: "Export all data (all galleries, bookmarks, favorites)? File might be large.",
+                alert_no_random: "No items to random in this view", alert_no_cover: "Please select a cover or upload at least 1 page",
+                alert_save_error: "Error saving: ", alert_edit_success: "Edited successfully!", alert_save_success: "Saved successfully!",
+                alert_import_success: "Imported {count} items successfully", alert_file_error: "Invalid file format", alert_import_error: "File error: ", alert_no_pages: "No images to read",
+                settingmodal: "Settings", local_backup_folder: "Local Backup Folder", select_folder: "Select Folder...", backup_info: "Data will be saved as .json files in this folder automatically.", restore_local: "Restore from Local Folder", close_btn_settings_modal: "Close", disconnect_folder: "Disconnect Folder"
+            },
+            cn: {
+                tags: "标签", artists: "作者",
+                search_placeholder: "搜索...", random_title: "随机挑选",
+                export_title: "导出全部 (备份)", import_title: "导入数据 (还原)",
+                upload: "上传", profile_title: "个人中心",
+                latest_updates: "最近更新", favorites: '<i class="fa-solid fa-heart text-nRed"></i> 我的收藏',
+                items_count: "个项目", no_data: "暂无数据",
+                no_data_search: '未找到 "{q}" 的相关结果', no_data_cat: '此分类下没有内容',
+                read_progress: '阅读进度 {current}/{total}',
+                sort_newest: "最新 - 最旧", sort_oldest: "最旧 - 最新",
+                sort_most_pages: "页数最多", sort_least_pages: "页数最少", sort_az: "A - Z", sort_za: "Z - A",
+                list_header: "列表", all_tags: '<i class="fa-solid fa-tags"></i> 所有标签', all_artists: '<i class="fa-solid fa-users"></i> 所有作者',
+                no_data_simple: "暂无内容",
+                upload_header_new: "上传新项目", upload_header_edit: "编辑信息",
+                cover_label: "封面图片 - 支持拖放", cover_placeholder: "点击或拖拽图片到此处",
+                title_label: "标题", title_placeholder: "输入标题...",
+                tags_label: "标签 <span class='text-xs text-gray-500'>- 用逗号 (,) 分隔</span>", tags_placeholder: "校园, 恋爱",
+                artists_label: "作者 <span class='text-xs text-gray-500'>- 用逗号 (,) 分隔</span>", artists_placeholder: "作者名",
+                pages_label: "内容页 - 可多选拖拽", add_image_btn: "添加图片",
+                pages_placeholder: "将图片拖到这里或点击添加", cancel_btn: "取消", save_btn: "保存并发布",
+                no_tags: "暂无标签", no_artists: "未知作者", pages_count: "页",
+                read_now: "立即阅读", read_continue: "继续阅读 (第 {page} 页)", random_read_title: "随机阅读",
+                clear_bookmark_title: "清除书签", delete_bookmark: "删除书签",
+                export_this_title: "导出此项", edit_title: "编辑", delete_title: "删除项目",
+                preview_header: "预览图", back_btn: "返回", page_label: "页", random_page_title: "随机跳页",
+                show_trans: "显示翻译", add_trans: "添加翻译", close_edit: "退出编辑",
+                settings_title: "显示设置", fit_window: "适应窗口", original_size: "原始大小",
+                edit_banner: "<b>编辑模式:</b> 点击图片添加框，拖动边缘移动", unsaved_warning: "尚未保存！",
+                save_page_btn: "保存本页", saved_msg: "已保存！", keyboard_hint: "使用键盘方向键 <kbd class='bg-gray-800 px-1 rounded'>←</kbd> <kbd class='bg-gray-800 px-1 rounded'>→</kbd> 翻页",
+                confirm_unsaved: "翻译未保存，确定要丢弃吗？", confirm_delete: "确定要删除吗？所有相关图片也将被删除",
+                confirm_delete_bookmark: "确定要删除阅读历史吗？", confirm_export_all: "确定要导出所有数据吗？（包含书签和收藏）文件可能会比较大",
+                alert_no_random: "没有可以随机的项目", alert_no_cover: "请设置封面或上传至少一张图片",
+                alert_save_error: "保存失败: ", alert_edit_success: "编辑成功！", alert_save_success: "保存成功！",
+                alert_import_success: "成功导入 {count} 个项目", alert_file_error: "文件格式无效", alert_import_error: "导入出错: ", alert_no_pages: "没有可查看的内容",
+                settingmodal: "设置", local_backup_folder: "本地备份文件夹", select_folder: "选择文件夹...", backup_info: "数据将自动保存为此文件夹中的 .json 文件", restore_local: "从本地文件夹恢复", close_btn_settings_modal: "关闭", disconnect_folder: "断开文件夹"
+            },
+            jp: {
+                tags: "タグ", artists: "作者",
+                search_placeholder: "検索...", random_title: "ランダムに表示",
+                export_title: "全データを書き出し", import_title: "データを読み込み",
+                upload: "アップロード", profile_title: "プロフィール",
+                latest_updates: "最近の更新", favorites: '<i class="fa-solid fa-heart text-nRed"></i> お気に入り',
+                items_count: "アイテム", no_data: "データがありません",
+                no_data_search: '"{q}" に一致する結果はありません', no_data_cat: 'このカテゴリは空です',
+                read_progress: '{current}/{total} ページ',
+                sort_newest: "新しい順", sort_oldest: "古い順",
+                sort_most_pages: "ページ多い順", sort_least_pages: "ページ少ない順", sort_az: "A - Z", sort_za: "Z - A",
+                list_header: "リスト", all_tags: '<i class="fa-solid fa-tags"></i> すべてのタグ', all_artists: '<i class="fa-solid fa-users"></i> すべての作者',
+                no_data_simple: "データなし",
+                upload_header_new: "新規登録", upload_header_edit: "情報を編集",
+                cover_label: "表紙画像 - ドラッグ＆ドロップ可", cover_placeholder: "クリックまたは画像をドラッグ",
+                title_label: "タイトル", title_placeholder: "タイトルを入力してください...",
+                tags_label: "タグ <span class='text-xs text-gray-500'>- カンマ (,) 区切り</span>", tags_placeholder: "恋愛, 学園",
+                artists_label: "作者 <span class='text-xs text-gray-500'>- カンマ (,) 区切り</span>", artists_placeholder: "作者名",
+                pages_label: "ページ - 複数ドラッグ＆ドロップ可", add_image_btn: "画像を追加",
+                pages_placeholder: "画像をここにドラッグするかクリックして追加", cancel_btn: "キャンセル", save_btn: "保存して公開",
+                no_tags: "タグなし", no_artists: "不明", pages_count: "枚",
+                read_now: "今すぐ読む", read_continue: "続きから読む ({page} ページ)", random_read_title: "ランダム再生",
+                clear_bookmark_title: "ブックマーク解除", delete_bookmark: "削除",
+                export_this_title: "これを書き出し", edit_title: "編集", delete_title: "削除する",
+                preview_header: "プレビュー", back_btn: "戻る", page_label: "ページ", random_page_title: "ページをランダム表示",
+                show_trans: "翻訳を表示", add_trans: "翻訳を追加", close_edit: "編集終了",
+                settings_title: "画像サイズ", fit_window: "ウィンドウに合わせる", original_size: "元のサイズ",
+                edit_banner: "<b>編集モード:</b> 画像をクリックして枠を追加、枠をドラッグして移動", unsaved_warning: "未保存の変更があります！",
+                save_page_btn: "このページを保存", saved_msg: "保存完了！", keyboard_hint: "キーボードの矢印キー <kbd class='bg-gray-800 px-1 rounded'>←</kbd> <kbd class='bg-gray-800 px-1 rounded'>→</kbd> で操作",
+                confirm_unsaved: "変更が保存されていません。破棄してもよろしいですか？", confirm_delete: "本当に削除しますか？関連する全画像が削除されます",
+                confirm_delete_bookmark: "閲覧履歴を削除しますか？", confirm_export_all: "全データを書き出しますか？（ブックマーク、お気に入り含む）",
+                alert_no_random: "表示できる項目がありません", alert_no_cover: "表紙または画像を1枚以上選択してください",
+                alert_save_error: "保存エラー: ", alert_edit_success: "編集しました！", alert_save_success: "保存しました！",
+                alert_import_success: "{count} 件インポートしました", alert_file_error: "ファイル形式が正しくありません", alert_import_error: "エラーが発生しました: ", alert_no_pages: "表示する画像がありません",
+                settingmodal: "設定", local_backup_folder: "ローカルバックアップフォルダ", select_folder: "フォルダを選択...", backup_info: "データはこのフォルダに .json ファイルとして自動的に保存されます", restore_local: "ローカルフォルダから復元", close_btn_settings_modal: "閉じる", disconnect_folder: "フォルダを切断"
+            }
+        };
+
+        function T(key, params = {}) {
+            let text = I18N[App.lang][key] || key;
+            for (const [k, v] of Object.entries(params)) {
+                text = text.replace(`{${k}}`, v);
+            }
+            return text;
+        }
+
+        // ================= DATABASE (Dexie.js) v3 =================
+        const db = new Dexie("UrgalDB");
+        db.version(4).stores({
+            galleries: '++id, title, createdAt, isFavorite, lastReadPage, totalPages',
+            pages: '++id, galleryId, order',
+            settings: 'key' 
+        });
+
+        // ================= GLOBAL STATE =================
+        const App = {
+            lang: 'th',
+            currentView: 'home', // Will be updated by router
+            currentGalleryId: null, // Will be updated by router
+            gridMode: 'home', // 'home', 'tag', 'artist', 'user'
+            currentGridIds: [], // Store current list of IDs for random feature
+            searchQuery: '',
+            currentNavParams: null, // Will be updated by router
+            reader: {
+                currentIndex: 0,
+                isEditMode: false,
+                showTranslations: true,
+                hasUnsavedChanges: false,
+                selectedBox: null,
+                imgFit: 'fit'
+            }
+        };
+
+        // ================= STATE MANAGER (Persistence) =================
+        const StateManager = {
+            save: () => {
+                // Save current state for session restoration
+                const stateToSave = { 
+                    lang: App.lang,
+                    view: App.currentView, 
+                    galleryId: App.currentGalleryId, 
+                    pageIndex: App.reader.currentIndex,
+                    navParams: App.currentNavParams,
+                    gridSort: Grid.currentSort,
+                    gridPage: Grid.currentPage
+                };
+                localStorage.setItem('UrgalState', JSON.stringify(stateToSave));
+            },
+            load: async () => {
+                // 1. Set language from storage
+                const savedState = JSON.parse(localStorage.getItem('UrgalState'));
+                if (savedState && savedState.lang) {
+                    App.lang = savedState.lang;
+                    document.getElementById('langSelect').value = App.lang;
+                }
+                
+                if (savedState && savedState.gridSort) {
+                    Grid.currentSort = savedState.gridSort;
+                }
+                if (savedState && savedState.gridPage) {
+                    Grid.currentPage = savedState.gridPage;
+                }
+
+                // 2. Determine initial state (URL hash > localStorage > default)
+                let initialState = { view: 'home', params: null };
+                if (location.hash) {
+                    const [_, view, paramsStr] = location.hash.match(/^#([a-zA-Z_]+)(?:\/(.*))?$/) || [];
+                    if (view) {
+                        let params = paramsStr ? (isNaN(paramsStr) ? paramsStr : Number(paramsStr)) : null;
+                        // Special case for reader: params are galleryId,index
+                        if (view === 'reader' && paramsStr) {
+                            const [galleryId, index] = paramsStr.split(',').map(Number);
+                            params = { galleryId, index: index || 0 };
+                        }
+                        initialState = { view, params };
+                    }
+                } else if (savedState) {
+                    initialState = { view: savedState.view, params: savedState.navParams };
+                    if (savedState.view === 'reader' && savedState.galleryId) {
+                        initialState.params = { galleryId: savedState.galleryId, index: savedState.pageIndex || 0 };
+                    }
+                }
+
+                // 3. Render initial view and set history
+                history.replaceState(initialState, '', UI.stateToUrl(initialState));
+                await UI.renderView(initialState);
+            }
+        };
+
+        // ================= UI CONTROLLER =================
+        const UI = {
+            changeLang: (lang) => {
+                App.lang = lang;
+                // Re-render current view with new language
+                UI.renderView(history.state);
+                StateManager.save();
+            },
+            applyLanguage: () => {
+                document.querySelectorAll('[data-i18n]').forEach(el => el.innerHTML = T(el.dataset.i18n));
+                document.querySelectorAll('[data-i18n-placeholder]').forEach(el => el.placeholder = T(el.dataset.i18nPlaceholder));
+                document.querySelectorAll('[data-i18n-title]').forEach(el => el.title = T(el.dataset.i18nTitle));
+            },
+            navigate: (viewName, params = null) => {
+                // Prevent navigation if unsaved changes
+                if (App.reader.hasUnsavedChanges && !confirm(T('confirm_unsaved'))) {
+                    return;
+                }
+                App.reader.hasUnsavedChanges = false;
+
+                Grid.currentPage = 1; // Reset pagination on new navigation
+
+                const state = { view: viewName, params: params };
+                const url = UI.stateToUrl(state);
+
+                // Only push if URL is different to avoid duplicate history entries
+                if (location.hash !== url) {
+                    history.pushState(state, '', url);
+                }
+                UI.renderView(state);
+            },
+            renderView: async (state) => {
+                if (!state || !state.view) state = { view: 'home', params: null }; // Fallback
+                const { view: viewName, params } = state;
+                
+                App.currentView = viewName;
+                App.currentNavParams = params;
+                
+                document.querySelectorAll('.view').forEach(v => v.classList.add('hide'));
+                
+                // Reset search bar when navigating away from grids
+                if (!['home', 'tags', 'artists', 'user'].includes(viewName) && document.getElementById('searchInput')) {
+                    document.getElementById('searchInput').value = '';
+                    App.searchQuery = '';
+                }
+
+                 if (viewName === 'home') {
+                    document.getElementById('view-grid').classList.remove('hide');
+                    document.getElementById('navSearchZone').classList.remove('hide');
+                    await Grid.load('home');
+                } else if (viewName === 'user') {
+                    document.getElementById('view-grid').classList.remove('hide');
+                    document.getElementById('navSearchZone').classList.remove('hide');
+                    await Grid.load('user');
+                } else if (viewName === 'tags' || viewName === 'artists') {
+                    document.getElementById('view-list').classList.remove('hide');
+                    document.getElementById('navSearchZone').classList.add('hide');
+                    await List.load(viewName);
+                } else if (viewName === 'tagFilter' || viewName === 'artistFilter') {
+                    document.getElementById('view-grid').classList.remove('hide');
+                    document.getElementById('navSearchZone').classList.remove('hide');
+                    await Grid.load(viewName, params);
+                } else if (viewName === 'upload') {
+                    document.getElementById('view-upload').classList.remove('hide');
+                    document.getElementById('navSearchZone').classList.add('hide');
+                    document.getElementById('uploadHeader').innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> <span data-i18n="upload_header_new">${T('upload_header_new')}</span>`; // Reset header
+                    UploadManager.reset();
+                } else if (viewName === 'edit' && params) {
+                    document.getElementById('view-upload').classList.remove('hide');
+                    document.getElementById('navSearchZone').classList.add('hide');
+                    await UploadManager.loadForEdit(params);
+                } else if (viewName === 'detail' && params) {
+                    document.getElementById('view-detail').classList.remove('hide');
+                    document.getElementById('navSearchZone').classList.add('hide');
+                    await Detail.load(params);
+                } else if (viewName === 'reader' && params && params.galleryId) {
+                    // This case is for direct navigation to a reader page (e.g., from history)
+                    if (!App.pages || App.currentGalleryId !== params.galleryId) {
+                        await Detail.load(params.galleryId); // This loads App.pages
+                    }
+                    document.getElementById('view-reader').classList.remove('hide');
+                    document.getElementById('navSearchZone').classList.add('hide');
+                    Reader.startReading(params.index || 0, true); // Start without navigating
+                }
+                window.scrollTo(0, 0);
+                StateManager.save();
+                UI.applyLanguage();
+            },
+            stateToUrl: (state) => {
+                if (state.view === 'reader' && state.params) {
+                    // Special URL for reader to include page index
+                    return `#reader/${state.params.galleryId},${state.params.index || 0}`;
+                }
+                return `#${state.view}${state.params ? '/' + state.params : ''}`;
+            },
+            createTagBadge: (text, type = 'tag') => {
+                const color = type === 'artist' ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-tagBg hover:bg-gray-600';
+                const linkType = type === 'artist' ? 'artistFilter' : 'tagFilter';
+                return `<span onclick="UI.navigate('${linkType}', '${text}')" class="px-2 py-1 ${color} rounded text-xs font-semibold cursor-pointer transition inline-block">${text.trim()}</span>`;
+            },
+            handleSearch: (e) => {
+                App.searchQuery = e.target.value.toLowerCase();
+                Grid.currentPage = 1;
+                Grid.renderCurrentList();
+            },
+            handleRandom: () => {
+                if(App.currentGridIds.length > 0) {
+                    const randomId = App.currentGridIds[Math.floor(Math.random() * App.currentGridIds.length)];
+                    UI.navigate('detail', randomId);
+                } else {
+                    alert(T('alert_no_random'));
+                }
+            }
+        };
+
+        // ================= GRID CONTROLLER (Home, Filters, User) =================
+        const Grid = {
+            allGalleries: [],
+            currentTitle: '',
+            currentPage: 1,
+            itemsPerPage: 60,
+            currentSort: 'newest',
+            
+            load: async (mode, param = null) => {
+                App.gridMode = mode;
+                let galleries = await db.galleries.toArray(); // Get all for in-memory sorting
+                
+                if (mode === 'home') {
+                    Grid.currentTitle = T('latest_updates');
+                } else if (mode === 'user') {
+                    Grid.currentTitle = T('favorites');
+                    galleries = galleries.filter(g => g.isFavorite);
+                } else if (mode === 'tagFilter') {
+                    Grid.currentTitle = `<i class="fa-solid fa-tag"></i> ${param}`;
+                    galleries = galleries.filter(g => g.tags.includes(param));
+                } else if (mode === 'artistFilter') {
+                    Grid.currentTitle = `<i class="fa-solid fa-palette"></i> ${param}`;
+                    galleries = galleries.filter(g => g.artists.includes(param));
+                }
+
+                Grid.allGalleries = galleries;
+                // Reset button state
+                if(document.getElementById('btnGridEdit')) document.getElementById('btnGridEdit').innerHTML = '<i class="fa-solid fa-pen"></i>';
+                Grid.applySort(); // Apply default or current sort
+                Grid.renderCurrentList();
+            },
+
+            handleSortChange: (sortMode) => {
+                Grid.currentSort = sortMode;
+                Grid.applySort();
+                Grid.currentPage = 1;
+                Grid.renderCurrentList();
+                StateManager.save();
+            },
+
+            applySort: () => {
+                const sort = Grid.currentSort;
+                Grid.allGalleries.sort((a, b) => {
+                    if (sort === 'newest') return new Date(b.createdAt) - new Date(a.createdAt);
+                    if (sort === 'oldest') return new Date(a.createdAt) - new Date(b.createdAt);
+                    if (sort === 'az') return a.title.localeCompare(b.title);
+                    if (sort === 'za') return b.title.localeCompare(a.title);
+                    if (sort === 'most_pages') return (b.totalPages || 0) - (a.totalPages || 0);
+                    if (sort === 'least_pages') return (a.totalPages || 0) - (b.totalPages || 0);
+                    return 0;
+                });
+            },
+
+            changePage: (page) => {
+                Grid.currentPage = page;
+                Grid.renderCurrentList();
+                window.scrollTo(0, 0);
+                StateManager.save();
+            },
+
+            toggleEditMode: () => {
+                Grid.isEditMode = !Grid.isEditMode;
+                const btn = document.getElementById('btnGridEdit');
+                if(Grid.isEditMode){
+                    btn.classList.replace('text-gray-400', 'text-nRed');
+                    btn.innerHTML = '<i class="fa-solid fa-check"></i>'; // Save/Done icon
+                } else {
+                    btn.classList.replace('text-nRed', 'text-gray-400');
+                    btn.innerHTML = '<i class="fa-solid fa-pen"></i>';
+                }
+                Grid.renderCurrentList();
+            },
+
+            deleteItem: async (id, e) => {
+                e.stopPropagation();
+                if(confirm(T('confirm_delete'))){
+                    await db.pages.where('galleryId').equals(id).delete();
+                    await db.galleries.delete(id);
+                    // Reload grid data
+                    Grid.load(App.gridMode, App.currentNavParams);
+                }
+            },
+
+            renderCurrentList: () => {
+                const grid = document.getElementById('gallery-grid');
+                const pagination = document.getElementById('grid-pagination');
+                const sortSelect = document.getElementById('sortGrid');
+                if(sortSelect) sortSelect.value = Grid.currentSort;
+
+                grid.innerHTML = '';
+                if(pagination) pagination.innerHTML = '';
+
+                // Restore button state if needed (in case of re-render without full load)
+                const btn = document.getElementById('btnGridEdit');
+                if(btn && Grid.isEditMode) {
+                    btn.classList.replace('text-gray-400', 'text-nRed');
+                    btn.innerHTML = '<i class="fa-solid fa-check"></i>';
+                }
+                
+                let filtered = Grid.allGalleries;
+                if (App.searchQuery) {
+                    filtered = filtered.filter(g => g.title.toLowerCase().includes(App.searchQuery) || 
+                                                    g.tags.some(t => t.toLowerCase().includes(App.searchQuery)) ||
+                                                    g.artists.some(a => a.toLowerCase().includes(App.searchQuery)));
+                }
+
+                document.getElementById('gridTitle').innerHTML = Grid.currentTitle;
+                document.getElementById('gridCount').textContent = `${filtered.length} ${T('items_count')}`;
+                
+                // Store IDs for Random feature
+                App.currentGridIds = filtered.map(g => g.id);
+
+                if (filtered.length === 0) {
+                    document.getElementById('grid-empty').classList.remove('hide');
+                    document.getElementById('grid-empty-text').textContent = App.searchQuery ? T('no_data_search', {q: App.searchQuery}) : T('no_data_cat');
+                } else {
+                    document.getElementById('grid-empty').classList.add('hide');
+                    
+                    // Pagination Logic
+                    const totalPages = Math.ceil(filtered.length / Grid.itemsPerPage);
+                    if (Grid.currentPage > totalPages) Grid.currentPage = 1;
+
+                    const start = (Grid.currentPage - 1) * Grid.itemsPerPage;
+                    const end = start + Grid.itemsPerPage;
+                    const itemsToShow = filtered.slice(start, end);
+
+                    itemsToShow.forEach(g => {
+                        const coverUrl = g.coverBlob ? URL.createObjectURL(g.coverBlob) : '';
+                        // Bookmark Logic
+                        const hasProgress = (g.lastReadPage !== undefined && g.lastReadPage !== null && g.totalPages);
+                        const progressText = hasProgress ? T('read_progress', {current: g.lastReadPage + 1, total: g.totalPages}) : '';
+                        const isFinished = hasProgress && (g.lastReadPage + 1 >= g.totalPages);
+
+                        grid.innerHTML += `
+                            <div class="gallery-card bg-darkCard rounded overflow-hidden shadow cursor-pointer relative group" onclick="UI.navigate('detail', ${g.id})">
+                                <div class="aspect-a4 overflow-hidden relative">
+                                    <img src="${coverUrl}" class="cover-img w-full h-full object-cover">
+                                    ${Grid.isEditMode ? `<button onclick="Grid.deleteItem(${g.id}, event)" class="absolute top-0 right-0 bg-red-600 text-white w-8 h-8 flex items-center justify-center z-20 hover:bg-red-700 transition shadow-md rounded-bl-lg"><i class="fa-solid fa-xmark"></i></button>` : ''}
+                                    <div class="absolute top-2 right-2 flex flex-col gap-1 items-end">
+                                        ${g.isFavorite ? '<div class="text-nRed text-lg shadow-black drop-shadow-md"><i class="fa-solid fa-heart"></i></div>' : ''}
+                                        ${(hasProgress && !isFinished) ? '<div class="text-yellow-400 text-lg shadow-black drop-shadow-md"><i class="fa-solid fa-bookmark"></i></div>' : ''}
+                                    </div>
+                                    <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-2 pt-6">
+                                        <div class="text-white text-xs font-bold truncate">${g.title}</div>
+                                        ${(hasProgress && !isFinished) ? `<div class="text-yellow-400 text-[10px] font-bold mt-1"><i class="fa-solid fa-book-open"></i> ${progressText}</div>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    // Render Pagination Controls
+                    if (totalPages > 1 && pagination) {
+                        let html = '';
+                        // Prev Button
+                        html += `<button onclick="Grid.changePage(${Math.max(1, Grid.currentPage - 1)})" class="w-8 h-8 rounded bg-gray-700 hover:bg-gray-600 flex items-center justify-center disabled:opacity-50 text-white" ${Grid.currentPage === 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button>`;
+
+                        const generateBtn = (i) => {
+                            const active = i === Grid.currentPage ? 'bg-nRed text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600';
+                            return `<button onclick="Grid.changePage(${i})" class="w-8 h-8 rounded ${active} font-bold text-sm">${i}</button>`;
+                        };
+
+                        if (totalPages <= 12) {
+                            for (let i = 1; i <= totalPages; i++) html += generateBtn(i);
+                        } else {
+                            if (Grid.currentPage <= 9) {
+                                for (let i = 1; i <= 11; i++) html += generateBtn(i);
+                                html += `<span class="px-1 text-gray-500 self-center">...</span>`;
+                                html += generateBtn(totalPages);
+                            } else if (Grid.currentPage >= totalPages - 8) {
+                                html += generateBtn(1);
+                                html += `<span class="px-1 text-gray-500 self-center">...</span>`;
+                                for (let i = totalPages - 10; i <= totalPages; i++) html += generateBtn(i);
+                            } else {
+                                html += generateBtn(1);
+                                html += `<span class="px-1 text-gray-500 self-center">...</span>`;
+                                for (let i = Grid.currentPage - 4; i <= Grid.currentPage + 5; i++) html += generateBtn(i);
+                                html += `<span class="px-1 text-gray-500 self-center">...</span>`;
+                                html += generateBtn(totalPages);
+                            }
+                        }
+
+                        // Next Button
+                        html += `<button onclick="Grid.changePage(${Math.min(totalPages, Grid.currentPage + 1)})" class="w-8 h-8 rounded bg-gray-700 hover:bg-gray-600 flex items-center justify-center disabled:opacity-50 text-white" ${Grid.currentPage === totalPages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button>`;
+                        
+                        pagination.innerHTML = html;
+                    }
+                }
+            }
+        };
+
+        // ================= LIST CONTROLLER (Tags, Artists view) =================
+        const List = {
+            load: async (mode) => {
+                const galleries = await db.galleries.toArray();
+                const counts = {};
+                
+                galleries.forEach(g => {
+                    const items = mode === 'tags' ? g.tags : g.artists;
+                    items.forEach(item => {
+                        counts[item] = (counts[item] || 0) + 1;
+                    });
+                });
+
+                document.getElementById('listTitle').innerHTML = mode === 'tags' ? T('all_tags') : T('all_artists');
+                
+                const container = document.getElementById('list-container');
+                container.innerHTML = '';
+                
+                const sortedItems = Object.entries(counts).sort((a, b) => b[1] - a[1]); // Sort by count desc
+                
+                if(sortedItems.length === 0) {
+                    container.innerHTML = `<p class="text-gray-500">${T('no_data_simple')}</p>`;
+                    return;
+                }
+
+                const color = mode === 'tags' ? 'bg-tagBg hover:bg-gray-600' : 'bg-indigo-600 hover:bg-indigo-500';
+                const linkType = mode === 'tags' ? 'tagFilter' : 'artistFilter';
+
+                sortedItems.forEach(([name, count]) => {
+                    container.innerHTML += `
+                        <button onclick="UI.navigate('${linkType}', '${name}')" class="${color} text-white px-3 py-1.5 rounded-full text-sm transition flex items-center gap-2">
+                            ${name} <span class="bg-black/30 px-1.5 rounded-full text-xs">${count}</span>
+                        </button>
+                    `;
+                });
+            }
+        };
+
+        // ================= UPLOAD MANAGER (with Drag & Drop) =================
+        const UploadManager = {
+            coverFile: null,
+            pageFiles: [],
+            editingId: null,
+
+            initDragAndDrop: () => {
+                const setupZone = (id, inputId, callback) => {
+                    const zone = document.getElementById(id);
+                    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+                    zone.addEventListener('dragleave', e => { zone.classList.remove('drag-over'); });
+                    zone.addEventListener('drop', e => {
+                        e.preventDefault();
+                        zone.classList.remove('drag-over');
+                        callback({ target: { files: e.dataTransfer.files }}); // Mock event for existing handlers
+                    });
+                };
+                setupZone('dropZoneCover', 'coverInput', UploadManager.handleCoverSelect);
+                setupZone('dropZonePages', 'pagesInput', UploadManager.handlePagesSelect);
+            },
+
+            reset: () => {
+                UploadManager.editingId = null;
+                document.getElementById('upTitle').value = '';
+                // Header reset handled in UI.navigate
+                document.getElementById('upTags').value = '';
+                document.getElementById('upArtists').value = '';
+                UploadManager.coverFile = null;
+                document.getElementById('coverPreview').src = '';
+                document.getElementById('coverPreview').classList.add('hide');
+                document.getElementById('coverPlaceholder').classList.remove('hide');
+                
+                UploadManager.pageFiles.forEach(p => URL.revokeObjectURL(p.url));
+                UploadManager.pageFiles = [];
+                UploadManager.renderPagesGrid();
+            },
+
+            loadForEdit: async (id) => {
+                UploadManager.reset();
+                UploadManager.editingId = id;
+                const g = await db.galleries.get(id);
+                const pages = await db.pages.where('galleryId').equals(id).sortBy('order');
+                
+                document.getElementById('uploadHeader').innerHTML = `<i class="fa-solid fa-wrench"></i> <span data-i18n="upload_header_edit">${T('upload_header_edit')}</span>`;
+                document.getElementById('upTitle').value = g.title;
+                document.getElementById('upTags').value = g.tags.join(', ');
+                document.getElementById('upArtists').value = g.artists.join(', ');
+
+                if (g.coverBlob) {
+                    UploadManager.coverFile = g.coverBlob;
+                    document.getElementById('coverPreview').src = URL.createObjectURL(g.coverBlob);
+                    document.getElementById('coverPreview').classList.remove('hide');
+                    document.getElementById('coverPlaceholder').classList.add('hide');
+                }
+
+                UploadManager.pageFiles = pages.map(p => ({
+                    id: p.id,
+                    file: p.imageBlob,
+                    url: URL.createObjectURL(p.imageBlob),
+                    translations: p.translations || []
+                }));
+                UploadManager.renderPagesGrid();
+            },
+
+            handleCoverSelect: (e) => {
+                const file = e.target.files[0];
+                if (!file || !file.type.startsWith('image/')) return;
+                UploadManager.coverFile = file;
+                const url = URL.createObjectURL(file);
+                document.getElementById('coverPreview').src = url;
+                document.getElementById('coverPreview').classList.remove('hide');
+                document.getElementById('coverPlaceholder').classList.add('hide');
+            },
+
+            handlePagesSelect: (e) => {
+                const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/'));
+                files.forEach(file => {
+                    UploadManager.pageFiles.push({
+                        id: Date.now() + Math.random(), file: file, url: URL.createObjectURL(file)
+                    });
+                });
+                UploadManager.renderPagesGrid();
+                if(e.target.id === 'pagesInput') e.target.value = '';
+            },
+
+            renderPagesGrid: () => {
+                const grid = document.getElementById('dropZonePages');
+                grid.innerHTML = '';
+                UploadManager.pageFiles.forEach((page, index) => {
+                    grid.innerHTML += `
+                        <div class="relative group rounded overflow-hidden aspect-a4 bg-gray-800 border border-gray-600">
+                            <span class="absolute top-1 left-1 bg-black/70 text-white text-xs px-1.5 rounded z-10">${index + 1}</span>
+                            <button onclick="UploadManager.removePage(${index})" class="absolute top-1 right-1 bg-red-600 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition z-10"><i class="fa-solid fa-xmark"></i></button>
+                            <img src="${page.url}" class="w-full h-full object-cover pointer-events-none">
+                            <div class="absolute bottom-0 left-0 right-0 bg-black/60 p-1 flex justify-between opacity-0 group-hover:opacity-100 transition">
+                                <button onclick="UploadManager.movePage(${index}, -1)" class="text-white hover:text-nRed text-sm p-1" ${index === 0 ? 'disabled class="opacity-30"' : ''}><i class="fa-solid fa-arrow-left"></i></button>
+                                <button onclick="UploadManager.movePage(${index}, 1)" class="text-white hover:text-nRed text-sm p-1" ${index === UploadManager.pageFiles.length - 1 ? 'disabled class="opacity-30"' : ''}><i class="fa-solid fa-arrow-right"></i></button>
+                            </div>
+                        </div>
+                    `;
+                });
+                if(UploadManager.pageFiles.length === 0){
+                    grid.innerHTML = `<div class="col-span-full flex flex-col items-center justify-center text-gray-500 min-h-[150px] pointer-events-none"><i class="fa-solid fa-images text-4xl mb-2"></i><p data-i18n="pages_placeholder">${T('pages_placeholder')}</p></div>`;
+                }
+            },
+
+            removePage: (index) => { URL.revokeObjectURL(UploadManager.pageFiles[index].url); UploadManager.pageFiles.splice(index, 1); UploadManager.renderPagesGrid(); },
+            movePage: (index, dir) => {
+                if (index + dir < 0 || index + dir >= UploadManager.pageFiles.length) return;
+                const temp = UploadManager.pageFiles[index];
+                UploadManager.pageFiles[index] = UploadManager.pageFiles[index + dir];
+                UploadManager.pageFiles[index + dir] = temp;
+                UploadManager.renderPagesGrid();
+            },
+
+            saveGallery: async () => {
+                const title = document.getElementById('upTitle').value.trim() || 'Untitled Gallery';
+                const tags = document.getElementById('upTags').value.split(',').map(t => t.trim()).filter(t => t);
+                const artists = document.getElementById('upArtists').value.split(',').map(t => t.trim()).filter(t => t);
+                
+                if (!UploadManager.coverFile && UploadManager.pageFiles.length === 0) return alert(T('alert_no_cover'));
+                const coverBlob = UploadManager.coverFile || UploadManager.pageFiles[0].file;
+
+                try {
+                    let galleryId;
+                    if (UploadManager.editingId) {
+                        // Update existing
+                        galleryId = UploadManager.editingId;
+                        await db.galleries.update(galleryId, { title, tags, artists, coverBlob, totalPages: UploadManager.pageFiles.length });
+                        
+                        // Replace pages (delete old, insert current state)
+                        await db.pages.where('galleryId').equals(galleryId).delete();
+                        const pagesToSave = UploadManager.pageFiles.map((p, index) => ({ galleryId, order: index, imageBlob: p.file, translations: p.translations || [] }));
+                        if(pagesToSave.length > 0) await db.pages.bulkAdd(pagesToSave);
+                        
+                        alert(T('alert_edit_success'));
+                        await FileSystemManager.syncToLocal(galleryId);
+                    } else {
+                        // Create new
+                        galleryId = await db.galleries.add({ title, tags, artists, coverBlob, createdAt: new Date().toISOString(), isFavorite: false, totalPages: UploadManager.pageFiles.length });
+                        const pagesToSave = UploadManager.pageFiles.map((p, index) => ({ galleryId, order: index, imageBlob: p.file, translations: [] }));
+                        if(pagesToSave.length > 0) await db.pages.bulkAdd(pagesToSave);
+                        alert(T('alert_save_success'));
+                        await FileSystemManager.syncToLocal(galleryId);
+                    }
+
+                    UI.navigate('detail', galleryId);
+                } catch (e) { alert(T('alert_save_error') + e.message); }
+            }
+        };
+
+        // ================= FILE SYSTEM MANAGER (Local Sync) =================
+        const FileSystemManager = {
+            dirHandle: null,
+
+            init: async () => {
+                try {
+                    const record = await db.settings.get('backupDir');
+                    if (record && record.handle) {
+                        FileSystemManager.dirHandle = record.handle;
+                        document.getElementById('folderName').innerText = record.name || 'Folder Selected';
+                    }
+                } catch (e) { console.error("FS Init error", e); }
+            },
+
+            selectFolder: async () => {
+                try {
+                    const handle = await window.showDirectoryPicker();
+                    FileSystemManager.dirHandle = handle;
+                    // Save handle to IndexedDB to remember user's choice
+                    await db.settings.put({ key: 'backupDir', handle: handle, name: handle.name });
+                    document.getElementById('folderName').innerText = handle.name;
+                } catch (e) { console.error("Folder selection cancelled", e); }
+            },
+
+            disconnectFolder: async () => {
+                FileSystemManager.dirHandle = null;
+                await db.settings.delete('backupDir');
+                document.getElementById('folderName').innerText = T('select_folder');
+            },
+
+            verifyPermission: async (readWrite = false) => {
+                if (!FileSystemManager.dirHandle) return false;
+                const options = {};
+                if (readWrite) options.mode = 'readwrite';
+                // Check if permission was already granted
+                if ((await FileSystemManager.dirHandle.queryPermission(options)) === 'granted') return true;
+                // Request permission
+                if ((await FileSystemManager.dirHandle.requestPermission(options)) === 'granted') return true;
+                return false;
+            },
+
+            syncToLocal: async (galleryId) => {
+                if (!FileSystemManager.dirHandle) return;
+                
+                const hasPerm = await FileSystemManager.verifyPermission(true);
+                if (!hasPerm) return;
+
+                try {
+                    const g = await db.galleries.get(galleryId);
+                    const pages = await db.pages.where('galleryId').equals(galleryId).sortBy('order');
+                    const coverBase64 = g.coverBlob ? await DataManager.blobToBase64(g.coverBlob) : null;
+                    const pagesWithBase64 = await Promise.all(pages.map(async p => ({ ...p, imageBlob: await DataManager.blobToBase64(p.imageBlob) })));
+
+                    const data = { type: 'single_gallery', gallery: { ...g, coverBlob: coverBase64 }, pages: pagesWithBase64 };
+                    
+                    // Use ID.json to avoid filename character issues
+                    const fileName = `${galleryId}.json`;
+                    const fileHandle = await FileSystemManager.dirHandle.getFileHandle(fileName, { create: true });
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(JSON.stringify(data, null, 2));
+                    await writable.close();
+                } catch (e) { console.error("Sync failed", e); }
+            },
+
+            restoreFromLocal: async () => {
+                if (!FileSystemManager.dirHandle) return alert("Please select a folder first.");
+                if (!(await FileSystemManager.verifyPermission())) return;
+
+                // Check if DB is empty as requested
+                const count = await db.galleries.count();
+                if (count > 0 && !confirm("Database is not empty. Continue restoring? (Duplicates may occur)")) return;
+
+                let importedCount = 0;
+                try {
+                    for await (const entry of FileSystemManager.dirHandle.values()) {
+                        if (entry.kind === 'file' && entry.name.endsWith('.json')) {
+                            try {
+                                const file = await entry.getFile();
+                                const text = await file.text();
+                                const json = JSON.parse(text);
+                                
+                                if (json.type === 'single_gallery') {
+                                    // Check if this ID already exists to prevent duplicate key error if reusing IDs
+                                    const exists = await db.galleries.get(json.gallery.id);
+                                    if (!exists) {
+                                        if(json.gallery.coverBlob) json.gallery.coverBlob = await DataManager.base64ToBlob(json.gallery.coverBlob);
+                                        
+                                        // Restore with original ID
+                                        await db.galleries.put(json.gallery);
+                                        
+                                        const pages = await Promise.all(json.pages.map(async p => ({ 
+                                            ...p, 
+                                            imageBlob: await DataManager.base64ToBlob(p.imageBlob) 
+                                        })));
+                                        await db.pages.bulkPut(pages);
+                                        importedCount++;
+                                    }
+                                }
+                            } catch (e) { console.error("Error reading file", entry.name, e); }
+                        }
+                    }
+                    alert(`Restored ${importedCount} items.`);
+                    UI.navigate('home');
+                } catch (e) { alert("Restore failed: " + e.message); }
+            }
+        };
+
+        // ================= DATA MANAGER (Import/Export) =================
+        const DataManager = {
+            blobToBase64: (blob) => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(blob);
+                });
+            },
+            base64ToBlob: async (base64) => {
+                const res = await fetch(base64);
+                return await res.blob();
+            },
+            
+            exportGallery: async (id) => {
+                try {
+                    const g = await db.galleries.get(id);
+                    const pages = await db.pages.where('galleryId').equals(id).sortBy('order');
+                    
+                    // Convert Blobs to Base64
+                    const coverBase64 = g.coverBlob ? await DataManager.blobToBase64(g.coverBlob) : null;
+                    const pagesWithBase64 = await Promise.all(pages.map(async p => ({
+                        ...p,
+                        imageBlob: await DataManager.blobToBase64(p.imageBlob)
+                    })));
+
+                    const data = {
+                        type: 'single_gallery',
+                        gallery: { ...g, coverBlob: coverBase64 },
+                        pages: pagesWithBase64
+                    };
+
+                    DataManager.downloadJSON(data, `gallery-${g.title.substring(0, 20)}.json`);
+                } catch(e) { alert('เกิดข้อผิดพลาดในการส่งออก: ' + e.message); }
+            },
+
+            exportAll: async () => {
+                if(!confirm(T('confirm_export_all'))) return;
+                try {
+                    const galleries = await db.galleries.toArray();
+                    const allData = [];
+
+                    for(let g of galleries) {
+                        const pages = await db.pages.where('galleryId').equals(g.id).sortBy('order');
+                        const coverBase64 = g.coverBlob ? await DataManager.blobToBase64(g.coverBlob) : null;
+                        const pagesWithBase64 = await Promise.all(pages.map(async p => ({
+                            ...p,
+                            imageBlob: await DataManager.blobToBase64(p.imageBlob)
+                        })));
+                        allData.push({ gallery: { ...g, coverBlob: coverBase64 }, pages: pagesWithBase64 });
+                    }
+
+                    const backup = { type: 'full_backup', data: allData, date: new Date().toISOString() };
+                    DataManager.downloadJSON(backup, `UrGal-full-backup-${Date.now()}.json`);
+                } catch(e) { alert('เกิดข้อผิดพลาด: ' + e.message); }
+            },
+
+            downloadJSON: (data, filename) => {
+                const blob = new Blob([JSON.stringify(data)], {type: "application/json"});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = filename; a.click();
+                URL.revokeObjectURL(url);
+            },
+
+            importData: async (event) => {
+                const file = event.target.files[0];
+                if(!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    try {
+                        const json = JSON.parse(e.target.result);
+                        const importItem = async (item) => {
+                            const gData = item.gallery;
+                            const pData = item.pages;
+                            
+                            delete gData.id; // Remove ID to allow auto-increment (duplicate import)
+                            if(gData.coverBlob) gData.coverBlob = await DataManager.base64ToBlob(gData.coverBlob);
+                            
+                            const newId = await db.galleries.add(gData);
+                            
+                            const pagesToSave = await Promise.all(pData.map(async p => ({
+                                galleryId: newId,
+                                order: p.order,
+                                imageBlob: await DataManager.base64ToBlob(p.imageBlob),
+                                translations: p.translations || []
+                            })));
+                            
+                            if(pagesToSave.length > 0) await db.pages.bulkAdd(pagesToSave);
+                        };
+
+                        if (json.type === 'single_gallery') {
+                            await importItem(json);
+                            alert(T('alert_import_success', {count: 1}));
+                        } else if (json.type === 'full_backup') {
+                            for(let item of json.data) await importItem(item);
+                            alert(T('alert_import_success', {count: json.data.length}));
+                        } else {
+                            alert(T('alert_file_error'));
+                        }
+                        
+                        UI.navigate('home');
+                    } catch(err) { alert(T('alert_import_error') + err.message); }
+                };
+                reader.readAsText(file);
+                event.target.value = ''; // Reset input
+            },
+            
+            clearBookmark: async (id) => {
+                if(confirm(T('confirm_delete_bookmark'))) {
+                    await db.galleries.update(id, { lastReadPage: null });
+                    Detail.load(id); // Reload UI
+                }
+            }
+        };
+
+        // ================= DETAIL CONTROLLER =================
+        const Detail = {
+            currentGallery: null,
+            load: async (id) => {
+                App.currentGalleryId = id;
+                const gallery = await db.galleries.get(id);
+                if (!gallery) return UI.navigate('home');
+                Detail.currentGallery = gallery;
+
+                document.getElementById('detTitle').textContent = gallery.title;
+                document.getElementById('detCover').src = URL.createObjectURL(gallery.coverBlob);
+                document.getElementById('detTags').innerHTML = gallery.tags.length ? gallery.tags.map(t => UI.createTagBadge(t, 'tag')).join('') : `<span class="text-gray-500 text-sm">${T('no_tags')}</span>`;
+                document.getElementById('detArtists').innerHTML = gallery.artists.length ? gallery.artists.map(t => UI.createTagBadge(t, 'artist')).join('') : `<span class="text-gray-500 text-sm">${T('no_artists')}</span>`;
+                document.getElementById('detDate').textContent = new Date(gallery.createdAt).toLocaleDateString('th-TH');
+                
+                Detail.updateFavoriteBtn();
+                
+                // Build Action Buttons
+                let buttonsHtml = `
+                    <button onclick="UI.navigate('reader', { galleryId: ${id}, index: ${gallery.lastReadPage || 0} })" class="bg-nRed hover:bg-nRedHover px-6 py-2.5 rounded font-bold text-lg shadow-lg flex items-center gap-2">
+                        <i class="fa-solid fa-book-open-reader"></i> ${gallery.lastReadPage ? T('read_continue', {page: gallery.lastReadPage + 1}) : T('read_now')}
+                    </button>
+                    <button onclick="Detail.readRandom(${id})" class="bg-purple-600 hover:bg-purple-700 px-4 py-2.5 rounded font-bold text-white transition shadow-lg" title="${T('random_read_title')}">
+                        <i class="fa-solid fa-dice"></i>
+                    </button>
+                `;
+
+                // Clear Bookmark Button
+                if (gallery.lastReadPage !== undefined && gallery.lastReadPage !== null) {
+                    buttonsHtml += `
+                        <button onclick="DataManager.clearBookmark(${id})" class="bg-gray-700 hover:bg-red-500 text-white px-4 py-2.5 rounded font-bold transition flex items-center gap-2" title="${T('clear_bookmark_title')}">
+                            <i class="fa-solid fa-bookmark"></i><i class="fa-solid fa-slash absolute text-xs ml-1 mt-1 text-black"></i> ${T('delete_bookmark')}
+                        </button>
+                    `;
+                }
+
+                // Change button text if reading in progress
+                buttonsHtml += `
+                    <button onclick="DataManager.exportGallery(${id})" class="bg-green-600 hover:bg-green-700 px-4 py-2.5 rounded font-bold text-white transition" title="${T('export_this_title')}">
+                        <i class="fa-solid fa-file-export"></i>
+                    </button>
+                    <button onclick="UI.navigate('edit', ${id})" class="bg-blue-600 hover:bg-blue-700 px-4 py-2.5 rounded font-bold text-white transition" title="${T('edit_title')}">
+                        <i class="fa-solid fa-wrench"></i>
+                    </button>
+                    <button onclick="DB.deleteGallery(${id})" class="bg-gray-700 hover:bg-red-900 px-4 py-2.5 rounded font-bold text-white transition" title="${T('delete_title')}">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                `;
+
+                document.getElementById('detActionButtons').innerHTML = buttonsHtml;
+
+                const pages = await db.pages.where('galleryId').equals(id).sortBy('order');
+                App.pages = pages;
+                document.getElementById('detPageCount').textContent = pages.length;
+
+                const grid = document.getElementById('detPagesGrid');
+                grid.innerHTML = '';
+                pages.forEach((page, index) => {
+                    grid.innerHTML += `<div class="aspect-a4 bg-gray-800 rounded overflow-hidden cursor-pointer hover:ring-2 hover:ring-nRed transition" onclick="UI.navigate('reader', { galleryId: ${id}, index: ${index} })"><img src="${URL.createObjectURL(page.imageBlob)}" class="w-full h-full object-cover"></div>`;
+                });
+            },
+            updateFavoriteBtn: () => {
+                const btn = document.getElementById('btnFavorite');
+                if (Detail.currentGallery.isFavorite) {
+                    btn.innerHTML = '<i class="fa-solid fa-heart text-nRed"></i>';
+                    btn.classList.add('text-nRed');
+                } else {
+                    btn.innerHTML = '<i class="fa-regular fa-heart"></i>';
+                    btn.classList.remove('text-nRed');
+                }
+            },
+            toggleFavorite: async () => {
+                Detail.currentGallery.isFavorite = !Detail.currentGallery.isFavorite;
+                await db.galleries.update(Detail.currentGallery.id, { isFavorite: Detail.currentGallery.isFavorite });
+                Detail.updateFavoriteBtn();
+            },
+            readRandom: (galleryId) => {
+                if(App.pages && App.pages.length > 0) {
+                    const rnd = Math.floor(Math.random() * App.pages.length);
+                    UI.navigate('reader', { galleryId, index: rnd });
+                }
+            }
+        };
+
+        // ================= READER & TRANSLATION CONTROLLER =================
+        const Reader = {
+            dragTarget: null, startOffsetX: 0, startOffsetY: 0,
+            resizeTarget: null, isResizing: false,
+
+            startReading: (index = 0, fromHistory = false) => {
+                if (App.pages.length === 0) {
+                    alert(T('alert_no_pages'));
+                    history.back(); // Go back if no pages
+                    return;
+                }
+                App.reader.currentIndex = index;
+                if (!fromHistory) {
+                    App.reader.isEditMode = false;
+                    App.reader.hasUnsavedChanges = false;
+                    App.reader.showTranslations = true;
+                    document.getElementById('showTransToggle').checked = true;
+                    Reader.selectBox(null);
+                }
+                Reader.renderPage();
+            },
+
+            renderPage: () => {
+                const page = App.pages[App.reader.currentIndex];
+                
+                // Update Progress to DB and save state
+                db.galleries.update(App.currentGalleryId, { 
+                    lastReadPage: App.reader.currentIndex, 
+                    totalPages: App.pages.length 
+                });
+                StateManager.save();
+
+                const imgEl = document.getElementById('readerImage');
+                imgEl.src = URL.createObjectURL(page.imageBlob);
+                
+                imgEl.onload = () => {
+                    const layer = document.getElementById('translationLayer');
+                    layer.style.width = imgEl.clientWidth + 'px';
+                    layer.style.height = imgEl.clientHeight + 'px';
+                    layer.style.left = imgEl.offsetLeft + 'px';
+                    layer.style.top = imgEl.offsetTop + 'px';
+                };
+
+                document.getElementById('readerCurrentPage').textContent = App.reader.currentIndex + 1;
+                document.getElementById('readerTotalPages').textContent = App.pages.length;
+                
+                Reader.updateEditBanner();
+                Reader.renderTranslations();
+            },
+
+            handleBackBtn: () => {
+                if (App.reader.hasUnsavedChanges && !confirm(T('confirm_unsaved'))) return;
+                App.reader.hasUnsavedChanges = false;
+                UI.navigate('detail', App.currentGalleryId);
+            },
+
+            nextPage: () => {
+                if (App.reader.hasUnsavedChanges && !confirm(T('confirm_unsaved'))) return;
+                App.reader.hasUnsavedChanges = false;
+                if (App.reader.currentIndex < App.pages.length - 1) {
+                    App.reader.currentIndex++; Reader.renderPage(); window.scrollTo(0,0);
+                }
+            },
+
+            prevPage: () => {
+                if (App.reader.hasUnsavedChanges && !confirm(T('confirm_unsaved'))) return;
+                App.reader.hasUnsavedChanges = false;
+                if (App.reader.currentIndex > 0) {
+                    App.reader.currentIndex--; Reader.renderPage(); window.scrollTo(0,0);
+                }
+            },
+
+            randomPage: () => {
+                if (App.reader.hasUnsavedChanges && !confirm(T('confirm_unsaved'))) return;
+                App.reader.hasUnsavedChanges = false;
+                if(App.pages.length > 0) {
+                    const newIndex = Math.floor(Math.random() * App.pages.length);
+                    UI.navigate('reader', { galleryId: App.currentGalleryId, index: newIndex });
+                    window.scrollTo(0,0);
+                }
+            },
+
+            toggleShowTranslations: () => { App.reader.showTranslations = document.getElementById('showTransToggle').checked; Reader.renderTranslations(); },
+            
+            updateImgFit: (mode) => {
+                App.reader.imgFit = mode;
+                const img = document.getElementById('readerImage');
+                if(mode === 'fit') {
+                    img.className = 'reader-img-fit block';
+                } else {
+                    img.className = 'reader-img-original block';
+                }
+                // Trigger reload to fix layer size
+                if(img.complete) img.onload(); 
+            },
+
+            // --- Edit Mode & Translations ---
+            toggleEditMode: () => {
+                App.reader.isEditMode = !App.reader.isEditMode;
+                if (App.reader.isEditMode) {
+                    App.reader.showTranslations = true; document.getElementById('showTransToggle').checked = true;
+                } else {
+                    Reader.selectBox(null);
+                }
+                Reader.updateEditBanner();
+                Reader.renderTranslations(); 
+            },
+
+            updateEditBanner: () => {
+                const banner = document.getElementById('editModeBanner');
+                const btn = document.getElementById('btnEditTrans');
+                const layer = document.getElementById('translationLayer');
+                
+                if (App.reader.isEditMode) {
+                    banner.classList.remove('hide');
+                    layer.classList.add('edit-mode');
+                    btn.classList.replace('bg-yellow-600', 'bg-nRed');
+                    btn.innerHTML = `<i class="fa-solid fa-check"></i> ${T('close_edit')}`;
+                } else {
+                    banner.classList.add('hide');
+                    layer.classList.remove('edit-mode');
+                    btn.classList.replace('bg-nRed', 'bg-yellow-600');
+                    btn.innerHTML = `<i class="fa-solid fa-plus"></i> ${T('add_trans')}`;
+                }
+                Reader.markUnsaved(App.reader.hasUnsavedChanges);
+            },
+
+            markUnsaved: (isUnsaved = true) => {
+                App.reader.hasUnsavedChanges = isUnsaved;
+                const w = document.getElementById('unsavedWarning');
+                if(w) isUnsaved ? w.classList.remove('hide') : w.classList.add('hide');
+            },
+
+            handleLayerClick: (e) => {
+                if (!App.reader.isEditMode) return;
+                // If clicked empty space on layer
+                if (e.target.id === 'translationLayer') {
+                    const rect = e.target.getBoundingClientRect();
+                    const xPercent = ((e.clientX - rect.left) / rect.width) * 100;
+                    const yPercent = ((e.clientY - rect.top) / rect.height) * 100;
+                    Reader.createTranslationBox({ x: xPercent, y: yPercent, w: 20, h: 10, text: '', fontSize: 14, bgMode: 'white', colorMode: 'black' }, true);
+                    Reader.markUnsaved();
+                }
+            },
+
+            createTranslationBox: (data, focus = false) => {
+                const layer = document.getElementById('translationLayer');
+                const box = document.createElement('div');
+                const isViewOnly = !App.reader.isEditMode;
+
+                box.className = `trans-box ${isViewOnly ? 'view-only' : ''}`;
+                box.style.left = `${data.x}%`; box.style.top = `${data.y}%`;
+                box.style.width = data.w ? `${data.w}%` : 'auto'; box.style.height = data.h ? `${data.h}%` : 'auto';
+                
+                // Store format data in DOM for easy access
+                box.dataset.fontSize = data.fontSize || 14;
+                box.dataset.bgMode = data.bgMode || 'white';
+                box.dataset.colorMode = data.colorMode || 'black';
+
+                Reader.applyBoxStyle(box);
+
+                if (isViewOnly) {
+                    box.innerText = data.text;
+                } else {
+                    box.innerHTML = `
+                        <div class="trans-box-delete" title="ลบกล่องนี้"><i class="fa-solid fa-xmark"></i></div>
+                        <textarea class="trans-content" placeholder="พิมพ์...">${data.text}</textarea>
+                    `;
+                    
+                    const textarea = box.querySelector('textarea');
+                    
+                    // Box interactions
+                    box.addEventListener('mousedown', (e) => {
+                        // Prevent dragging if clicking textarea or delete button
+                        if(e.target === textarea || e.target.closest('.trans-box-delete')) return; 
+                        
+                        Reader.selectBox(box);
+                        Reader.dragTarget = box;
+                        const boxRect = box.getBoundingClientRect();
+                        Reader.startOffsetX = e.clientX - boxRect.left;
+                        Reader.startOffsetY = e.clientY - boxRect.top;
+                        e.stopPropagation();
+                    });
+
+                    textarea.addEventListener('focus', () => Reader.selectBox(box));
+                    textarea.addEventListener('input', () => Reader.markUnsaved());
+                    
+                    box.querySelector('.trans-box-delete').addEventListener('click', (e) => {
+                        e.stopPropagation(); box.remove(); Reader.selectBox(null); Reader.markUnsaved();
+                    });
+                    
+                    // Track resizing (MutationObserver is overkill, let's just use mouseup on the whole document to check if size changed, or simpler: just mark unsaved on any mouseup if selected)
+                    box.addEventListener('mouseup', () => { if(Reader.dragTarget || box === App.reader.selectedBox) Reader.markUnsaved(); });
+                }
+                
+                layer.appendChild(box);
+                if (focus && !isViewOnly) {
+                    const ta = box.querySelector('textarea');
+                    Reader.selectBox(box);
+                    setTimeout(() => ta.focus(), 50);
+                }
+            },
+
+            applyBoxStyle: (box) => {
+                const ta = box.querySelector('.trans-content');
+                const target = ta || box; // if view-only, apply to box text directly
+                
+                // Font Size
+                target.style.fontSize = box.dataset.fontSize + 'px';
+                
+                // Bg
+                box.classList.remove('bg-white-mode', 'bg-black-mode', 'bg-clear-mode');
+                box.classList.add(`bg-${box.dataset.bgMode}-mode`);
+                
+                // Color
+                target.classList.remove('text-dark', 'text-light');
+                target.classList.add(box.dataset.colorMode === 'black' ? 'text-dark' : 'text-light');
+            },
+
+            selectBox: (box) => {
+                const layer = document.getElementById('translationLayer');
+                layer.querySelectorAll('.trans-box').forEach(b => b.classList.remove('selected'));
+                App.reader.selectedBox = box;
+                
+                const toolbar = document.getElementById('transToolbar');
+                if (box) {
+                    box.classList.add('selected');
+                    toolbar.classList.remove('opacity-50', 'pointer-events-none');
+                    document.getElementById('tbSize').textContent = box.dataset.fontSize;
+                } else {
+                    toolbar.classList.add('opacity-50', 'pointer-events-none');
+                }
+            },
+
+            changeFormat: (type, val) => {
+                const box = App.reader.selectedBox;
+                if(!box) return;
+                
+                if (type === 'size') {
+                    let newSize = parseInt(box.dataset.fontSize) + val;
+                    if(newSize < 10) newSize = 10; if(newSize > 48) newSize = 48;
+                    box.dataset.fontSize = newSize;
+                    document.getElementById('tbSize').textContent = newSize;
+                } else if (type === 'bg') {
+                    box.dataset.bgMode = val;
+                } else if (type === 'color') {
+                    box.dataset.colorMode = val;
+                }
+                Reader.applyBoxStyle(box);
+                Reader.markUnsaved();
+            },
+
+            renderTranslations: () => {
+                const layer = document.getElementById('translationLayer');
+                layer.innerHTML = '';
+                Reader.selectBox(null);
+                
+                if (!App.reader.showTranslations && !App.reader.isEditMode) return;
+
+                const page = App.pages[App.reader.currentIndex];
+                if (page.translations) {
+                    page.translations.forEach(t => Reader.createTranslationBox(t));
+                }
+            },
+
+            saveTranslations: async () => {
+                const layer = document.getElementById('translationLayer');
+                const boxes = layer.querySelectorAll('.trans-box');
+                const layerRect = layer.getBoundingClientRect();
+                
+                const translations = [];
+                boxes.forEach(box => {
+                    const boxRect = box.getBoundingClientRect();
+                    const text = box.querySelector('.trans-content') ? box.querySelector('.trans-content').value : box.innerText;
+                    if (text.trim() === '') return;
+
+                    translations.push({
+                        x: ((boxRect.left - layerRect.left) / layerRect.width) * 100,
+                        y: ((boxRect.top - layerRect.top) / layerRect.height) * 100,
+                        w: (boxRect.width / layerRect.width) * 100,
+                        h: (boxRect.height / layerRect.height) * 100,
+                        text: text,
+                        fontSize: box.dataset.fontSize,
+                        bgMode: box.dataset.bgMode,
+                        colorMode: box.dataset.colorMode
+                    });
+                });
+
+                const page = App.pages[App.reader.currentIndex];
+                page.translations = translations;
+                
+                await db.pages.update(page.id, { translations });
+                Reader.markUnsaved(false);
+                
+                const btn = document.querySelector('#editModeBanner button:last-child');
+                const oldText = btn.innerText;
+                btn.innerText = T('saved_msg'); btn.classList.add('bg-green-500', 'text-white');
+                setTimeout(() => { btn.innerText = oldText; btn.classList.remove('bg-green-500', 'text-white'); }, 1500);
+            }
+        };
+
+        // ================= GLOBAL EVENTS =================
+        window.addEventListener('popstate', (event) => {
+            if (event.state) {
+                App.reader.hasUnsavedChanges = false; // Discard unsaved changes on history navigation
+                UI.renderView(event.state);
+            }
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (Reader.dragTarget) {
+                const layer = document.getElementById('translationLayer');
+                const rect = layer.getBoundingClientRect();
+                
+                let newLeft = e.clientX - rect.left - Reader.startOffsetX;
+                let newTop = e.clientY - rect.top - Reader.startOffsetY;
+
+                if(newLeft < 0) newLeft = 0; if(newTop < 0) newTop = 0;
+                if(newLeft + Reader.dragTarget.offsetWidth > rect.width) newLeft = rect.width - Reader.dragTarget.offsetWidth;
+                if(newTop + Reader.dragTarget.offsetHeight > rect.height) newTop = rect.height - Reader.dragTarget.offsetHeight;
+
+                Reader.dragTarget.style.left = `${(newLeft / rect.width) * 100}%`;
+                Reader.dragTarget.style.top = `${(newTop / rect.height) * 100}%`;
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            if(Reader.dragTarget) {
+                Reader.markUnsaved(); // Mark unsaved after drag ends
+                Reader.dragTarget = null;
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (App.currentView !== 'reader') return;
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return; // Ignore if typing
+            
+            if (e.key === 'ArrowRight' || e.key === 'd') Reader.nextPage();
+            if (e.key === 'ArrowLeft' || e.key === 'a') Reader.prevPage();
+            // Add Backspace for back navigation, but prevent it on input fields
+            if (e.key === 'Backspace' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') history.back();
+        });
+
+        window.addEventListener('resize', () => {
+            // Adjust translation layer size on window resize if in reader mode
+            if (App.currentView === 'reader') {
+                const img = document.getElementById('readerImage');
+                if(img.complete) img.onload();
+            }
+        });
+
+        const DB = {
+            deleteGallery: async (id) => {
+                if(confirm(T('confirm_delete'))){
+                    await db.pages.where('galleryId').equals(id).delete();
+                    await db.galleries.delete(id);
+                    UI.navigate('home');
+                }
+            }
+        }
+
+        window.onload = () => {
+            UploadManager.initDragAndDrop();
+            StateManager.load();
+            FileSystemManager.init();
+        };
+
+    </script>
+</body>
+</html>
