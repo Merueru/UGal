@@ -75,12 +75,7 @@
         .text-light { color: #fff; }
 
         /* Shape Modes */
-        .shape-circle { border-radius: 50%; aspect-ratio: 1; }
-        .shape-oval { border-radius: 50%; }
         .shape-rect { border-radius: 6px; }
-
-        /* Italic Style */
-        .text-italic { font-style: italic; }
 
         .trans-box-delete {
             position: absolute; top: 0; right: 4px;
@@ -372,10 +367,6 @@
                     <button onclick="Reader.changeFormat('size', 2)" class="px-2 hover:bg-yellow-800 rounded" title="เพิ่มขนาดตัวอักษร"><i class="fa-solid fa-a text-lg"></i></button>
                     <div class="w-px h-4 bg-yellow-800 mx-1"></div>
                     <button id="tbShapeRect" onclick="Reader.changeFormat('shape', 'rect')" class="px-2 py-0.5 hover:bg-yellow-800 rounded text-xs border border-white" title="สี่เหลี่ยม">▭</button>
-                    <button id="tbShapeCircle" onclick="Reader.changeFormat('shape', 'circle')" class="w-5 h-5 hover:bg-yellow-800 rounded-full border border-white flex items-center justify-center text-[10px]" title="วงกลม">●</button>
-                    <button id="tbShapeOval" onclick="Reader.changeFormat('shape', 'oval')" class="px-2 py-0.5 hover:bg-yellow-800 rounded text-xs border border-white" title="วงรี">⬭</button>
-                    <div class="w-px h-4 bg-yellow-800 mx-1"></div>
-                    <button id="tbItalic" onclick="Reader.changeFormat('italic', null)" class="px-2 hover:bg-yellow-800 rounded font-italic text-sm" title="ตัวเอียง"><i>I</i></button>
                     <div class="w-px h-4 bg-yellow-800 mx-1"></div>
                     <button onclick="Reader.changeFormat('bg', 'white')" class="w-5 h-5 rounded-full bg-white border border-gray-400" title="พื้นขาว"></button>
                     <button onclick="Reader.changeFormat('bg', 'black')" class="w-5 h-5 rounded-full bg-black border border-gray-400" title="พื้นดำ"></button>
@@ -540,7 +531,7 @@
                 alert_import_success: "นำเข้า {count} รายการสำเร็จ", alert_file_error: "รูปแบบไฟล์ไม่ถูกต้อง", alert_import_error: "ไฟล์เสียหายหรือผิดพลาด: ", alert_no_pages: "ไม่มีรูปภาพให้อ่าน",
                 settingmodal: "ตั้งค่า", local_backup_folder: "โฟลเดอร์สำรองข้อมูล", select_folder: "เลือกโฟลเดอร์...", backup_info: "ข้อมูลจะถูกบันทึกเป็นไฟล์ .json ในโฟลเดอร์นี้โดยอัตโนมัติ", restore_local: "กู้คืนจากโฟลเดอร์ในเครื่อง", close_btn_settings_modal: "ปิด", disconnect_folder: "ยกเลิกการสำรองข้อมูล",
                 new_trans_set_title: "สร้างชุดแปลใหม่", new_trans_set_placeholder: "เช่น แปลเล่น01 โดย ผู้ใช้A", create_btn: "สร้าง", export_trans_sets_title: "ส่งออกชุดแปล", export_btn: "ส่งออก", import_trans_sets_title: "นำเข้าชุดแปล", import_trans_sets_desc: "เลือกไฟล์ .json ของชุดแปล", import_btn: "นำเข้า", trans_sets_section: "ชุดแปล:",
-                addnewtranscollect: "+ชุดคำแปลใหม่",grid_edit_delete_title: "แก้ไข / ลบ",shape_rect: "สี่เหลี่ยม", shape_circle: "วงกลม", shape_oval: "วงรี", italic: "ตัวเอียง", delete_trans_sets: "ลบชุดคำแปล", delete_trans_sets_title: "ลบชุดคำแปล", delete_confirm_msg: "คุณแน่ใจหรือไม่ว่าต้องการลบชุดแปลที่เลือก?", delete_btn_text: "ลบ"
+                addnewtranscollect: "+ชุดคำแปลใหม่",grid_edit_delete_title: "แก้ไข / ลบ",shape_rect: "สี่เหลี่ยม", delete_trans_sets: "ลบชุดคำแปล", delete_trans_sets_title: "ลบชุดคำแปล", delete_confirm_msg: "คุณแน่ใจหรือไม่ว่าต้องการลบชุดแปลที่เลือก?", delete_btn_text: "ลบ"
             },
             en: {
                 tags: "Tags", artists: "Artists",
@@ -578,7 +569,7 @@
                 alert_import_success: "Imported {count} items successfully", alert_file_error: "Invalid file format", alert_import_error: "File error: ", alert_no_pages: "No images to read",
                 settingmodal: "Settings", local_backup_folder: "Local Backup Folder", select_folder: "Select Folder...", backup_info: "Data will be saved as .json files in this folder automatically.", restore_local: "Restore from Local Folder", close_btn_settings_modal: "Close", disconnect_folder: "Disconnect Folder",
                 new_trans_set_title: "Create Translation Set", new_trans_set_placeholder: "e.g. Translation Set 01 by User A", create_btn: "Create", export_trans_sets_title: "Export Translation Sets", export_btn: "Export", import_trans_sets_title: "Import Translation Sets", import_trans_sets_desc: "Select a .json file with translation sets", import_btn: "Import", trans_sets_section: "Translation Sets:",
-                addnewtranscollect: "+ New Set",grid_edit_delete_title: "Edit / Delete",shape_rect: "Rectangle", shape_circle: "Circle", shape_oval: "Oval", italic: "Italic", delete_trans_sets: "Delete Translation Sets", delete_trans_sets_title: "Delete Translation Sets", delete_confirm_msg: "Are you sure you want to delete selected translation sets?", delete_btn_text: "Delete"
+                addnewtranscollect: "+ New Set",grid_edit_delete_title: "Edit / Delete",shape_rect: "Rectangle", delete_trans_sets: "Delete Translation Sets", delete_trans_sets_title: "Delete Translation Sets", delete_confirm_msg: "Are you sure you want to delete selected translation sets?", delete_btn_text: "Delete"
             },
             cn: {
                 tags: "标签", artists: "作者",
@@ -1679,7 +1670,7 @@
                     const rect = e.target.getBoundingClientRect();
                     const xPercent = ((e.clientX - rect.left) / rect.width) * 100;
                     const yPercent = ((e.clientY - rect.top) / rect.height) * 100;
-                    Reader.createTranslationBox({ x: xPercent, y: yPercent, w: 20, h: 10, text: '', fontSize: 14, bgMode: 'white', colorMode: 'black', shape: 'rect', italic: false }, true);
+                    Reader.createTranslationBox({ x: xPercent, y: yPercent, w: 20, h: 10, text: '', fontSize: 14, bgMode: 'white', colorMode: 'black', shape: 'rect' }, true);
                     Reader.markUnsaved();
                 }
             },
@@ -1698,7 +1689,6 @@
                 box.dataset.bgMode = data.bgMode || 'white';
                 box.dataset.colorMode = data.colorMode || 'black';
                 box.dataset.shape = data.shape || 'rect';
-                box.dataset.italic = data.italic ? 'true' : 'false';
 
                 Reader.applyBoxStyle(box);
 
@@ -1751,19 +1741,12 @@
                 // Font Size
                 target.style.fontSize = box.dataset.fontSize + 'px';
                 
-                // Italic
-                if (box.dataset.italic === 'true') {
-                    target.style.fontStyle = 'italic';
-                } else {
-                    target.style.fontStyle = 'normal';
-                }
-                
                 // Bg
                 box.classList.remove('bg-white-mode', 'bg-black-mode', 'bg-clear-mode');
                 box.classList.add(`bg-${box.dataset.bgMode}-mode`);
                 
                 // Shape
-                box.classList.remove('shape-rect', 'shape-circle', 'shape-oval');
+                box.classList.remove('shape-rect');
                 box.classList.add(`shape-${box.dataset.shape}`);
                 
                 // Color
@@ -1784,11 +1767,7 @@
                     
                     // Update shape button highlights
                     document.getElementById('tbShapeRect').classList.toggle('bg-yellow-800', box.dataset.shape === 'rect');
-                    document.getElementById('tbShapeCircle').classList.toggle('bg-yellow-800', box.dataset.shape === 'circle');
-                    document.getElementById('tbShapeOval').classList.toggle('bg-yellow-800', box.dataset.shape === 'oval');
                     
-                    // Update italic button highlight
-                    document.getElementById('tbItalic').classList.toggle('bg-yellow-800', box.dataset.italic === 'true');
                 } else {
                     toolbar.classList.add('opacity-50', 'pointer-events-none');
                 }
@@ -1809,14 +1788,6 @@
                     box.dataset.colorMode = val;
                 } else if (type === 'shape') {
                     box.dataset.shape = val;
-                } else if (type === 'italic') {
-                    box.dataset.italic = box.dataset.italic === 'true' ? 'false' : 'true';
-                    const tbItalic = document.getElementById('tbItalic');
-                    if (box.dataset.italic === 'true') {
-                        tbItalic.classList.add('bg-yellow-800');
-                    } else {
-                        tbItalic.classList.remove('bg-yellow-800');
-                    }
                 }
                 Reader.applyBoxStyle(box);
                 Reader.markUnsaved();
@@ -1863,8 +1834,7 @@
                         fontSize: box.dataset.fontSize,
                         bgMode: box.dataset.bgMode,
                         colorMode: box.dataset.colorMode,
-                        shape: box.dataset.shape,
-                        italic: box.dataset.italic
+                        shape: box.dataset.shape
                     });
                 });
 
