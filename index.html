@@ -91,9 +91,89 @@
             resize: none; font-family: inherit; line-height: 1.4;
             cursor: text; /* Switch cursor back to text inside textarea */
         }
+
+        /* Toast Notification Styles */
+        #toastContainer {
+            position: fixed;
+            top: 20px; right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+
+        .toast {
+            background: rgba(30, 30, 30, 0.95);
+            border-left: 4px solid #ed2553;
+            color: #f3f4f6;
+            padding: 14px 18px;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            max-width: 400px;
+            pointer-events: auto;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .toast.success {
+            border-left-color: #10b981;
+        }
+
+        .toast.error {
+            border-left-color: #ef4444;
+        }
+
+        .toast.info {
+            border-left-color: #3b82f6;
+        }
+
+        .toast-icon {
+            flex-shrink: 0;
+            width: 20px;
+            text-align: center;
+            font-size: 16px;
+        }
+
+        .toast-message {
+            flex: 1;
+            word-wrap: break-word;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+        }
+
+        .toast.removing {
+            animation: slideOut 0.3s ease-in forwards;
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
+
+    <!-- Toast Container -->
+    <div id="toastContainer"></div>
 
     <!-- Navbar -->
     <nav class="bg-darkCard shadow-md border-b border-gray-700 sticky top-0 z-40">
@@ -101,7 +181,7 @@
             <div class="flex items-center gap-6">
                 <a href="#" onclick="UI.navigate('home')" class="text-xl font-bold flex items-center gap-2">
                     <span class="text-nRed hover:scale-110 transition" data-i18n-title="home_title"><i class="fa-solid fa-book-open"></i> UrGal</span>
-                     <p class="hidden sm:block text-gray-400 text-sm" style="font-size: 12px;">V 0.2.5</p>
+                     <p class="hidden sm:block text-gray-400 text-sm" style="font-size: 12px;">V 0.2.5.1</p>
                 </a>
                 <div class="hidden md:flex gap-4 text-sm font-semibold text-gray-300">
                     <a href="#" onclick="UI.navigate('home')" class="hover:text-nRed transition" data-i18n-title="home_title" data-i18n="home_page">หน้าหลัก</a>
@@ -531,6 +611,51 @@
     </main>
 
     <script>
+        // ================= TOAST NOTIFICATION SYSTEM =================
+        const Toast = {
+            show: function(message, type = 'info', duration = 5000) {
+                const container = document.getElementById('toastContainer');
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                
+                const icons = {
+                    success: '✓',
+                    error: '✕',
+                    info: 'ℹ'
+                };
+                
+                toast.innerHTML = `
+                    <div class="toast-icon">${icons[type] || '•'}</div>
+                    <div class="toast-message">${message}</div>
+                `;
+                
+                container.appendChild(toast);
+                
+                // Auto-remove after duration
+                const timeout = setTimeout(() => {
+                    toast.classList.add('removing');
+                    setTimeout(() => toast.remove(), 300);
+                }, duration);
+                
+                // Allow manual close on hover
+                toast.style.cursor = 'pointer';
+                toast.addEventListener('click', () => {
+                    clearTimeout(timeout);
+                    toast.classList.add('removing');
+                    setTimeout(() => toast.remove(), 300);
+                });
+            },
+            success: function(message, duration = 5000) {
+                this.show(message, 'success', duration);
+            },
+            error: function(message, duration = 5000) {
+                this.show(message, 'error', duration);
+            },
+            info: function(message, duration = 5000) {
+                this.show(message, 'info', duration);
+            }
+        };
+
         // ================= I18N SYSTEM =================
         const I18N = {
             th: {
@@ -952,7 +1077,7 @@
                     const randomId = App.currentGridIds[Math.floor(Math.random() * App.currentGridIds.length)];
                     UI.navigate('detail', randomId);
                 } else {
-                    alert(T('alert_no_random'));
+                    Toast.info(T('alert_no_random'));
                 }
             }
         };
@@ -1237,7 +1362,7 @@
                             // Loop ทุกหน้า
                             for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
                                 const page = await pdfDocument.getPage(pageNum);
-                                const scale = 2; // เพิ่มความคมชัด
+                                const scale = 2; // เพิ่มความคมชัด pdf.js แนะนำให้ใช้ scale 2 สำหรับความละเอียดที่ดี
                                 const viewport = page.getViewport({ scale });
                                 
                                 // สร้าง canvas
@@ -1261,7 +1386,7 @@
                                             fileName: `page_${pageNum}.png`
                                         });
                                     }
-                                }, 'image/png', 0.95);
+                                }, 'image/png', 0.95); // คุณภาพ 95% 
                             }
                             
                             // รอให้ทุก blob พร้อม
@@ -1388,7 +1513,7 @@
                             });
                         } catch (error) {
                             console.error('Error converting PDF:', error);
-                            alert('เกิดข้อผิดพลาดในการแปลง PDF: ' + error.message);
+                            Toast.error('เกิดข้อผิดพลาดในการแปลง PDF: ' + error.message);
                         }
                     }
                 }
@@ -1432,7 +1557,7 @@
                 const tags = document.getElementById('upTags').value.split(',').map(t => t.trim()).filter(t => t);
                 const artists = document.getElementById('upArtists').value.split(',').map(t => t.trim()).filter(t => t);
                 
-                if (!UploadManager.coverFile && UploadManager.pageFiles.length === 0) return alert(T('alert_no_cover'));
+                if (!UploadManager.coverFile && UploadManager.pageFiles.length === 0) return Toast.error(T('alert_no_cover'));
                 const coverBlob = UploadManager.coverFile || UploadManager.pageFiles[0].file;
 
                 try {
@@ -1447,19 +1572,19 @@
                         const pagesToSave = UploadManager.pageFiles.map((p, index) => ({ galleryId, order: index, imageBlob: p.file, translations: p.translations || [] }));
                         if(pagesToSave.length > 0) await db.pages.bulkAdd(pagesToSave);
                         
-                        alert(T('alert_edit_success'));
+                        Toast.success(T('alert_edit_success'));
                         await FileSystemManager.syncToLocal(galleryId);
                     } else {
                         // Create new
                         galleryId = await db.galleries.add({ title, tags, artists, coverBlob, createdAt: new Date().toISOString(), isFavorite: false, totalPages: UploadManager.pageFiles.length });
                         const pagesToSave = UploadManager.pageFiles.map((p, index) => ({ galleryId, order: index, imageBlob: p.file, translations: [] }));
                         if(pagesToSave.length > 0) await db.pages.bulkAdd(pagesToSave);
-                        alert(T('alert_save_success'));
+                        Toast.success(T('alert_save_success'));
                         await FileSystemManager.syncToLocal(galleryId);
                     }
 
                     UI.navigate('detail', galleryId);
-                } catch (e) { alert(T('alert_save_error') + e.message); }
+                } catch (e) { Toast.error(T('alert_save_error') + e.message); }
             }
         };
 
@@ -1528,7 +1653,7 @@
             },
 
             restoreFromLocal: async () => {
-                if (!FileSystemManager.dirHandle) return alert("Please select a folder first.");
+                if (!FileSystemManager.dirHandle) return Toast.error("Please select a folder first.");
                 if (!(await FileSystemManager.verifyPermission())) return;
 
                 // Check if DB is empty as requested
@@ -1564,9 +1689,9 @@
                             } catch (e) { console.error("Error reading file", entry.name, e); }
                         }
                     }
-                    alert(`Restored ${importedCount} items.`);
+                    Toast.success(`Restored ${importedCount} items.`);
                     UI.navigate('home');
-                } catch (e) { alert("Restore failed: " + e.message); }
+                } catch (e) { Toast.error("Restore failed: " + e.message); }
             }
         };
 
@@ -1604,7 +1729,7 @@
                     };
 
                     DataManager.downloadJSON(data, `UrGal-gallery-${g.title.substring(0, 20)}.json`);
-                } catch(e) { alert('เกิดข้อผิดพลาดในการส่งออก: ' + e.message); }
+                } catch(e) { Toast.error('เกิดข้อผิดพลาดในการส่งออก: ' + e.message); }
             },
 
             exportAll: async () => {
@@ -1625,7 +1750,7 @@
 
                     const backup = { type: 'full_backup', data: allData, date: new Date().toISOString() };
                     DataManager.downloadJSON(backup, `UrGal-full-backup-${Date.now()}.json`);
-                } catch(e) { alert('เกิดข้อผิดพลาด: ' + e.message); }
+                } catch(e) { Toast.error('เกิดข้อผิดพลาด: ' + e.message); }
             },
 
             downloadJSON: (data, filename) => {
@@ -1665,16 +1790,16 @@
 
                         if (json.type === 'single_gallery') {
                             await importItem(json);
-                            alert(T('alert_import_success', {count: 1}));
+                            Toast.success(T('alert_import_success', {count: 1}));
                         } else if (json.type === 'full_backup') {
                             for(let item of json.data) await importItem(item);
-                            alert(T('alert_import_success', {count: json.data.length}));
+                            Toast.success(T('alert_import_success', {count: json.data.length}));
                         } else {
-                            alert(T('alert_file_error'));
+                            Toast.error(T('alert_file_error'));
                         }
                         
                         UI.navigate('home');
-                    } catch(err) { alert(T('alert_import_error') + err.message); }
+                    } catch(err) { Toast.error(T('alert_import_error') + err.message); }
                 };
                 reader.readAsText(file);
                 event.target.value = ''; // Reset input
@@ -1790,7 +1915,7 @@
 
             startReading: (index = 0, fromHistory = false) => {
                 if (App.pages.length === 0) {
-                    alert(T('alert_no_pages'));
+                    Toast.error(T('alert_no_pages'));
                     history.back(); // Go back if no pages
                     return;
                 }
@@ -2420,7 +2545,7 @@
             createNewSet: async () => {
                 const name = document.getElementById('newTransSetName').value.trim();
                 if (!name) {
-                    alert('กรุณาใส่ชื่อชุดแปล');
+                    Toast.error('กรุณาใส่ชื่อชุดแปล');
                     return;
                 }
 
@@ -2514,7 +2639,7 @@
             exportSelected: async () => {
                 const checkboxes = document.querySelectorAll('.transSetCheckbox:checked');
                 if (checkboxes.length === 0) {
-                    alert('กรุณาเลือกชุดแปลที่ต้องการส่งออก');
+                    Toast.error('กรุณาเลือกชุดแปลที่ต้องการส่งออก');
                     return;
                 }
                 
@@ -2560,7 +2685,7 @@
                 DataManager.downloadJSON(exportData, filename);
                 
                 document.getElementById('exportTransSetModal').classList.add('hide');
-                alert(`ส่งออก ${setNames.join(', ')} สำเร็จ`);
+                Toast.success(`ส่งออก ${setNames.join(', ')} สำเร็จ`);
             },
 
             showImportDialog: () => {
@@ -2572,7 +2697,7 @@
                 const file = fileInput.files[0];
                 
                 if (!file) {
-                    alert('กรุณาเลือกไฟล์');
+                    Toast.error('กรุณาเลือกไฟล์');
                     return;
                 }
                 
@@ -2581,7 +2706,7 @@
                     const importData = JSON.parse(text);
                     
                     if (!importData.sets || !Array.isArray(importData.sets)) {
-                        alert('รูปแบบไฟล์ไม่ถูกต้อง');
+                        Toast.error('รูปแบบไฟล์ไม่ถูกต้อง');
                         return;
                     }
                     
@@ -2626,9 +2751,9 @@
                     document.getElementById('importTransSetModal').classList.add('hide');
                     fileInput.value = '';
                     
-                    alert('นำเข้าสำเร็จ');
+                    Toast.success('นำเข้าสำเร็จ');
                 } catch (e) {
-                    alert('เกิดข้อผิดพลาดในการนำเข้า: ' + e.message);
+                    Toast.error('เกิดข้อผิดพลาดในการนำเข้า: ' + e.message);
                 }
             },
 
@@ -2659,7 +2784,7 @@
             deleteSelected: async () => {
                 const checkboxes = document.querySelectorAll('.deleteTransSetCheckbox:checked');
                 if (checkboxes.length === 0) {
-                    alert('กรุณาเลือกชุดแปลที่ต้องการลบ');
+                    Toast.error('กรุณาเลือกชุดแปลที่ต้องการลบ');
                     return;
                 }
                 
@@ -2694,9 +2819,9 @@
                     document.getElementById('deleteTransSetModal').classList.add('hide');
                     TranslationManager.loadTranslationSets();
                     Reader.renderTranslations();
-                    alert('ลบชุดแปลสำเร็จ');
+                    Toast.success('ลบชุดแปลสำเร็จ');
                 } catch (e) {
-                    alert('เกิดข้อผิดพลาดในการลบ: ' + e.message);
+                    Toast.error('เกิดข้อผิดพลาดในการลบ: ' + e.message);
                 }
             }
         };
