@@ -249,13 +249,14 @@
             <div class="flex items-center gap-6">
                 <a href="#" onclick="UI.navigate('home')" class="text-xl font-bold flex items-center gap-2">
                     <span class="text-nRed hover:scale-110 transition" data-i18n-title="home_title"><i class="fa-solid fa-book-open"></i> UGal</span>
-                     <p class="hidden sm:block text-gray-400 text-sm" style="font-size: 12px;">V 0.2.9</p>
+                     <p class="hidden sm:block text-gray-400 text-sm" style="font-size: 12px;">V 0.3.0</p>
                 </a>
                 <div class="hidden md:flex gap-4 text-sm font-semibold text-gray-300">
                     <a href="#" onclick="UI.navigate('home')" class="hover:text-nRed transition" data-i18n-title="home_title" data-i18n="home_page">หน้าหลัก</a>
                     <a href="#" onclick="UI.navigate('tags')" class="hover:text-nRed transition" data-i18n="tags">แท็ก</a>
                     <a href="#" onclick="UI.navigate('artists')" class="hover:text-nRed transition" data-i18n="artists">ศิลปิน</a>
                     <a href="#" onclick="UI.navigate('characters')" class="hover:text-nRed transition" data-i18n="characters">ตัวละคร</a>
+                    <a href="#" onclick="UI.navigate('series')" class="hover:text-nRed transition" data-i18n="series">ซีรี่ย์</a>
                 </div>
             </div>
             
@@ -385,6 +386,13 @@
                                 <div id="characterSuggestionsList" class="divide-y divide-gray-700"></div>
                             </div>
                         </div>
+                        <div class="relative">
+                            <label class="block text-sm font-medium text-gray-300 mb-1" data-i18n="series_label">ซีรี่ย์ (Series) <span class="text-xs text-gray-500">- คั่นด้วยลูกน้ำ (,)</span></label>
+                            <input type="text" id="upSeries" data-i18n-placeholder="series_placeholder" class="w-full bg-darkBg border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-nRed" placeholder="series_name" autocomplete="off">
+                            <div id="seriesSuggestionsContainer" class="absolute top-full left-0 right-0 mt-1 bg-darkCard border border-gray-600 rounded shadow-lg max-h-48 overflow-y-auto z-50 hide">
+                                <div id="seriesSuggestionsList" class="divide-y divide-gray-700"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -436,16 +444,20 @@
                     </div>
                     
                     <div class="mb-4">
-                        <span class="text-gray-400 text-sm font-semibold w-20 inline-block">Artists:</span>
+                        <span class="text-gray-400 text-sm font-semibold w-28 inline-block" data-i18n="artists">Artists:</span>
                         <div id="detArtists" class="inline-flex flex-wrap gap-2"></div>
                     </div>
                     <div class="mb-4">
-                        <span class="text-gray-400 text-sm font-semibold w-20 inline-block" data-i18n="characters">Characters:</span>
+                        <span class="text-gray-400 text-sm font-semibold w-28 inline-block" data-i18n="tags">Tags:</span>
+                        <div id="detTags" class="inline-flex flex-wrap gap-2"></div>
+                    </div>
+                    <div class="mb-4">
+                        <span class="text-gray-400 text-sm font-semibold w-28 inline-block" data-i18n="characters">Characters:</span>
                         <div id="detCharacters" class="inline-flex flex-wrap gap-2"></div>
                     </div>
                     <div class="mb-6">
-                        <span class="text-gray-400 text-sm font-semibold w-20 inline-block">Tags:</span>
-                        <div id="detTags" class="inline-flex flex-wrap gap-2"></div>
+                        <span class="text-gray-400 text-sm font-semibold w-28 inline-block" data-i18n="series">Series:</span>
+                        <div id="detSeries" class="inline-flex flex-wrap gap-2"></div>
                     </div>
                     
                     <div class="flex items-center gap-4 text-gray-400 text-sm mb-6">
@@ -836,8 +848,10 @@
                 title_label: "ชื่อเรื่อง (Title)", title_placeholder: "ใส่ชื่อเรื่อง...",
                 tags_label: "แท็ก (Tags) <span class='text-xs text-gray-500'>- คั่นด้วยลูกน้ำ (,)</span>", tags_placeholder: "romance, school life",
                 artists_label: "ศิลปิน (Artists) <span class='text-xs text-gray-500'>- คั่นด้วยลูกน้ำ (,)</span>", artists_placeholder: "artist_name",
-                characters_label: "ตัวละคร (Characters) <span class='text-xs text-gray-500'>- คั่นด้วยลูกน้ำ (,)</span>", characters_placeholder: "character_name",
+                characters_label: "ตัวละคร (Characters)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class='text-xs text-gray-500'>- คั่นด้วยลูกน้ำ (,)</span>", characters_placeholder: "character_name",
                 characters: "ตัวละคร", all_characters: '<i class="fa-solid fa-masks-theater"></i> ตัวละครทั้งหมด', no_characters: "ไม่มีตัวละคร",
+                series_label: "ซีรี่ย์ (Series) <span class='text-xs text-gray-500'>- คั่นด้วยลูกน้ำ (,)</span>", series_placeholder: "series_name",
+                series: "ซีรี่ย์", all_series: '<i class="fa-solid fa-book"></i> ซีรี่ย์ทั้งหมด', no_series: "ไม่มีซีรี่ย์",
                 pages_label: "หน้าทั้งหมด (Pages) - ลากวางได้หลายรูป", add_image_btn: "เพิ่มรูปภาพ",
                 pages_placeholder: "ลากรูปภาพมาวางที่นี่ หรือกดเพิ่มรูปภาพ", cancel_btn: "ยกเลิก", save_btn: "บันทึกและเผยแพร่",
                 no_tags: "ไม่มีแท็ก", no_artists: "ไม่ระบุ", pages_count: "หน้า",
@@ -860,7 +874,7 @@
             },
             en: {
                 decrease_size_title: "Decrease text size", increase_size_title: "Increase text size", shape_rect_title: "Rectangle", bg_white_title: "White background", bg_black_title: "Black background", bg_clear_title: "Transparent background", color_black_title: "Black text", color_white_title: "White text",
-                tags: "Tags", artists: "Artists", home_title: "Home", home_page:"Home",
+                tags: "Tags", artists: "Artists", series: "Series", home_title: "Home", home_page:"Home",
                 search_placeholder: "Search...", list_search_placeholder: "Search list...", random_title: "Random from list",
                 export_title: "Export All (Backup)", import_title: "Import Data (Restore)",
                 upload: "Upload", profile_title: "Profile & Favorites", add_to_fav_list:"Add to Favorites",
@@ -870,7 +884,7 @@
                 read_progress: 'Read {current}/{total}', pagesett_none:"None",
                 sort_newest: "Newest - Oldest", sort_oldest: "Oldest - Newest",
                 sort_most_pages: "Most Pages", sort_least_pages: "Least Pages", sort_az: "A - Z", sort_za: "Z - A",
-                list_header: "List", all_tags: '<i class="fa-solid fa-tags"></i> All Tags', all_artists: '<i class="fa-solid fa-users"></i> All Artists',
+                list_header: "List", all_tags: '<i class="fa-solid fa-tags"></i> All Tags', all_artists: '<i class="fa-solid fa-users"></i> All Artists', all_series: '<i class="fa-solid fa-book"></i> All Series',
                 no_data_simple: "No data available", read_from_cover: "Read now",
                 upload_header_new: "Upload New", upload_header_edit: "Edit Info",
                 cover_label: "Cover Image - Drag & Drop", cover_placeholder: "Click or Drag image here",
@@ -879,6 +893,8 @@
                 artists_label: "Artists <span class='text-xs text-gray-500'>- comma separated</span>", artists_placeholder: "artist_name",
                 characters_label: "Characters <span class='text-xs text-gray-500'>- comma separated</span>", characters_placeholder: "character_name",
                 characters: "Characters", all_characters: '<i class="fa-solid fa-masks-theater"></i> All Characters', no_characters: "No Characters",
+                series_label: "Series <span class='text-xs text-gray-500'>- comma separated</span>", series_placeholder: "series_name",
+                series: "Series", all_series: '<i class="fa-solid fa-book"></i> All Series', no_series: "No Series",
                 pages_label: "Pages - Drag & Drop multiple", add_image_btn: "Add Images",
                 pages_placeholder: "Drag images here or click Add Images", cancel_btn: "Cancel", save_btn: "Save & Publish",
                 no_tags: "No Tags", no_artists: "Unknown", pages_count: "pages",
@@ -920,6 +936,8 @@
                 artists_label: "作者 <span class='text-xs text-gray-500'>- 用逗号 (,) 分隔</span>", artists_placeholder: "作者名",
                 characters_label: "角色 <span class='text-xs text-gray-500'>- 用逗号 (,) 分隔</span>", characters_placeholder: "角色名",
                 characters: "角色", all_characters: '<i class="fa-solid fa-masks-theater"></i> 所有角色', no_characters: "无角色",
+                series_label: "系列 <span class='text-xs text-gray-500'>- 用逗号 (,) 分隔</span>", series_placeholder: "系列名",
+                series: "系列", all_series: '<i class="fa-solid fa-book"></i> 所有系列', no_series: "无系列",
                 pages_label: "内容页 - 可多选拖拽", add_image_btn: "添加图片",
                 pages_placeholder: "将图片拖到这里或点击添加", cancel_btn: "取消", save_btn: "保存并发布",
                 no_tags: "暂无标签", no_artists: "未知作者", pages_count: "页",
@@ -961,6 +979,8 @@
                 artists_label: "作者 <span class='text-xs text-gray-500'>- カンマ (,) 区切り</span>", artists_placeholder: "作者名",
                 characters_label: "キャラクター <span class='text-xs text-gray-500'>- カンマ (,) 区切り</span>", characters_placeholder: "キャラ名",
                 characters: "キャラクター", all_characters: '<i class="fa-solid fa-masks-theater"></i> 全キャラクター', no_characters: "キャラなし",
+                series_label: "シリーズ <span class='text-xs text-gray-500'>- カンマ (,) 区切り</span>", series_placeholder: "シリーズ名",
+                series: "シリーズ", all_series: '<i class="fa-solid fa-book"></i> 全シリーズ', no_series: "シリーズなし",
                 pages_label: "ページ - 複数ドラッグ＆ドロップ可", add_image_btn: "画像を追加",
                 pages_placeholder: "画像をここにドラッグするかクリックして追加", cancel_btn: "キャンセル", save_btn: "保存して公開",
                 no_tags: "タグなし", no_artists: "不明", pages_count: "枚",
@@ -993,14 +1013,14 @@
 
         // ================= DATABASE (Dexie.js) v3 =================
         const db = new Dexie("UGalDB");
-        db.version(6).stores({
+        db.version(7).stores({
             galleries: '++id, title, createdAt, isFavorite, lastReadPage, totalPages',
             pages: '++id, galleryId, order',
             settings: 'key',
             translationSets: '++id, galleryId, name'
         });
         
-        // Migration for version 6 - add characters field
+        // Migration for version 7 - add series field
         db.on('populate', () => {
             const batchSize = 100;
             db.galleries.toArray().then(galleries => {
@@ -1008,6 +1028,7 @@
                     const batch = galleries.slice(i, i + batchSize);
                     batch.forEach(g => {
                         if (!g.characters) g.characters = [];
+                        if (!g.series) g.series = [];
                     });
                     db.galleries.bulkPut(batch);
                 }
@@ -1207,11 +1228,11 @@
                     document.getElementById('view-grid').classList.remove('hide');
                     document.getElementById('navSearchZone').classList.remove('hide');
                     await Grid.load('user');
-                } else if (viewName === 'tags' || viewName === 'artists' || viewName === 'characters') {
+                } else if (viewName === 'tags' || viewName === 'artists' || viewName === 'characters' || viewName === 'series') {
                     document.getElementById('view-list').classList.remove('hide');
                     document.getElementById('navSearchZone').classList.add('hide');
                     await List.load(viewName);
-                } else if (viewName === 'tagFilter' || viewName === 'artistFilter' || viewName === 'characterFilter') {
+                } else if (viewName === 'tagFilter' || viewName === 'artistFilter' || viewName === 'characterFilter' || viewName === 'seriesFilter') {
                     document.getElementById('view-grid').classList.remove('hide');
                     document.getElementById('navSearchZone').classList.remove('hide');
                     await Grid.load(viewName, params);
@@ -1265,6 +1286,9 @@
                 } else if (type === 'character') {
                     color = 'bg-purple-600 hover:bg-purple-500';
                     linkType = 'characterFilter';
+                } else if (type === 'series') {
+                    color = 'bg-amber-600 hover:bg-amber-500';
+                    linkType = 'seriesFilter';
                 } else {
                     color = 'bg-tagBg hover:bg-gray-600';
                     linkType = 'tagFilter';
@@ -1312,6 +1336,9 @@
                 } else if (mode === 'characterFilter') {
                     Grid.currentTitle = `<i class="fa-solid fa-masks-theater"></i> ${param}`;
                     galleries = galleries.filter(g => g.characters && g.characters.includes(param));
+                } else if (mode === 'seriesFilter') {
+                    Grid.currentTitle = `<i class="fa-solid fa-book"></i> ${param}`;
+                    galleries = galleries.filter(g => g.series && g.series.includes(param));
                 }
 
                 Grid.allGalleries = galleries;
@@ -1500,6 +1527,7 @@
                     if (mode === 'tags') items = g.tags;
                     else if (mode === 'artists') items = g.artists;
                     else if (mode === 'characters') items = g.characters || [];
+                    else if (mode === 'series') items = g.series || [];
                     
                     items.forEach(item => {
                         counts[item] = (counts[item] || 0) + 1;
@@ -1512,6 +1540,8 @@
                     document.getElementById('listTitle').innerHTML = T('all_artists');
                 } else if (mode === 'characters') {
                     document.getElementById('listTitle').innerHTML = T('all_characters');
+                } else if (mode === 'series') {
+                    document.getElementById('listTitle').innerHTML = T('all_series');
                 }
                 
                 List.allItems = Object.entries(counts).sort((a, b) => b[1] - a[1]);
@@ -1547,6 +1577,9 @@
                 } else if (List.currentMode === 'characters') {
                     color = 'bg-purple-600 hover:bg-purple-500';
                     linkType = 'characterFilter';
+                } else if (List.currentMode === 'series') {
+                    color = 'bg-amber-600 hover:bg-amber-500';
+                    linkType = 'seriesFilter';
                 }
 
                 filtered.forEach(([name, count]) => {
@@ -2091,6 +2124,155 @@
             }
         };
 
+        // ================= SERIES SUGGESTIONS MANAGER =================
+        const SeriesSuggestions = {
+            allSeries: [], // Array of {series, lastUsed} sorted by most recent
+            currentSuggestions: [],
+            selectedIndex: -1,
+            currentInputValue: '',
+
+            init: async () => {
+                await SeriesSuggestions.loadAllSeries();
+                SeriesSuggestions.attachEventListeners();
+            },
+
+            loadAllSeries: async () => {
+                try {
+                    const galleries = await db.galleries.toArray();
+                    const seriesMap = {}; // {series: lastUsedDate}
+                    
+                    // Collect all series with their last used dates
+                    galleries.forEach(g => {
+                        if (g.series && Array.isArray(g.series)) {
+                            g.series.forEach(series => {
+                                if (series.trim()) {
+                                    if (!seriesMap[series] || new Date(g.createdAt) > new Date(seriesMap[series])) {
+                                        seriesMap[series] = g.createdAt || new Date().toISOString();
+                                    }
+                                }
+                            });
+                        }
+                    });
+                    
+                    // Convert to array and sort by most recent, limit to 100
+                    SeriesSuggestions.allSeries = Object.entries(seriesMap)
+                        .map(([series, date]) => ({ series, lastUsed: new Date(date) }))
+                        .sort((a, b) => b.lastUsed - a.lastUsed)
+                        .slice(0, 100);
+                } catch (e) {
+                    console.error('Error loading series:', e);
+                }
+            },
+
+            attachEventListeners: () => {
+                const input = document.getElementById('upSeries');
+                if (!input) return;
+                
+                input.addEventListener('input', (e) => SeriesSuggestions.handleInput(e));
+                input.addEventListener('keydown', (e) => SeriesSuggestions.handleKeydown(e));
+                input.addEventListener('blur', () => setTimeout(() => SeriesSuggestions.hideSuggestions(), 200));
+            },
+
+            handleInput: (e) => {
+                const input = e.target;
+                const fullText = input.value;
+                const lastCommaIndex = fullText.lastIndexOf(',');
+                const currentSeries = fullText.substring(lastCommaIndex + 1).trim();
+                
+                SeriesSuggestions.currentInputValue = currentSeries;
+                SeriesSuggestions.selectedIndex = -1;
+                
+                if (currentSeries.length === 0) {
+                    SeriesSuggestions.hideSuggestions();
+                    return;
+                }
+                
+                // Filter suggestions - top 10 matching current series
+                SeriesSuggestions.currentSuggestions = SeriesSuggestions.allSeries
+                    .filter(({series}) => series.toLowerCase().includes(currentSeries.toLowerCase()))
+                    .slice(0, 10);
+                
+                if (SeriesSuggestions.currentSuggestions.length > 0) {
+                    SeriesSuggestions.renderSuggestions();
+                } else {
+                    SeriesSuggestions.hideSuggestions();
+                }
+            },
+
+            handleKeydown: (e) => {
+                const container = document.getElementById('seriesSuggestionsContainer');
+                
+                if (container.classList.contains('hide')) return;
+                
+                switch(e.key) {
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        SeriesSuggestions.selectedIndex = Math.min(
+                            SeriesSuggestions.selectedIndex + 1,
+                            SeriesSuggestions.currentSuggestions.length - 1
+                        );
+                        SeriesSuggestions.renderSuggestions();
+                        break;
+                    
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        SeriesSuggestions.selectedIndex = Math.max(SeriesSuggestions.selectedIndex - 1, -1);
+                        SeriesSuggestions.renderSuggestions();
+                        break;
+                    
+                    case 'Enter':
+                        if (SeriesSuggestions.selectedIndex >= 0) {
+                            e.preventDefault();
+                            SeriesSuggestions.selectSeries(SeriesSuggestions.currentSuggestions[SeriesSuggestions.selectedIndex].series);
+                        }
+                        break;
+                    
+                    case 'Escape':
+                        SeriesSuggestions.hideSuggestions();
+                        break;
+                }
+            },
+
+            selectSeries: (series) => {
+                const input = document.getElementById('upSeries');
+                const fullText = input.value;
+                const lastCommaIndex = fullText.lastIndexOf(',');
+                
+                // Build new text with selected series
+                const beforeSeries = lastCommaIndex >= 0 ? fullText.substring(0, lastCommaIndex + 1) : '';
+                const newValue = (beforeSeries + ' ' + series + ', ').replace(/^\s*,\s*/, '').replace(/^\s+/, '');
+                
+                input.value = newValue;
+                SeriesSuggestions.hideSuggestions();
+                input.focus();
+                // Move cursor to end
+                input.setSelectionRange(input.value.length, input.value.length);
+            },
+
+            renderSuggestions: () => {
+                const list = document.getElementById('seriesSuggestionsList');
+                list.innerHTML = '';
+                
+                SeriesSuggestions.currentSuggestions.forEach(({series}, index) => {
+                    const isSelected = index === SeriesSuggestions.selectedIndex;
+                    const item = document.createElement('div');
+                    item.className = `px-3 py-2 cursor-pointer transition ${
+                        isSelected ? 'bg-nRed text-white' : 'hover:bg-gray-700 text-gray-300'
+                    }`;
+                    item.textContent = series;
+                    item.onclick = () => SeriesSuggestions.selectSeries(series);
+                    list.appendChild(item);
+                });
+                
+                document.getElementById('seriesSuggestionsContainer').classList.remove('hide');
+            },
+
+            hideSuggestions: () => {
+                document.getElementById('seriesSuggestionsContainer').classList.add('hide');
+                SeriesSuggestions.selectedIndex = -1;
+            }
+        };
+
         // ================= UPLOAD MANAGER =================
         const UploadManager = {
             coverFile: null,
@@ -2122,6 +2304,7 @@
                 document.getElementById('upTags').value = '';
                 document.getElementById('upArtists').value = '';
                 document.getElementById('upCharacters').value = '';
+                document.getElementById('upSeries').value = '';
                 UploadManager.coverFile = null;
                 document.getElementById('coverPreview').src = '';
                 document.getElementById('coverPreview').classList.add('hide');
@@ -2142,6 +2325,7 @@
                 TagSuggestions.hideSuggestions();
                 ArtistSuggestions.hideSuggestions();
                 CharacterSuggestions.hideSuggestions();
+                SeriesSuggestions.hideSuggestions();
             },
 
             loadForEdit: async (id) => {
@@ -2155,6 +2339,7 @@
                 document.getElementById('upTags').value = g.tags.join(', ');
                 document.getElementById('upArtists').value = g.artists.join(', ');
                 document.getElementById('upCharacters').value = (g.characters ? g.characters.join(', ') : '');
+                document.getElementById('upSeries').value = (g.series ? g.series.join(', ') : '');
 
                 if (g.coverBlob) {
                     UploadManager.coverFile = g.coverBlob;
@@ -2171,10 +2356,11 @@
                 }));
                 UploadManager.renderPagesGrid();
                 
-                // Reload suggestions to ensure latest tags, artists, and characters are available
+                // Reload suggestions to ensure latest tags, artists, characters, and series are available
                 await TagSuggestions.loadAllTags();
                 await ArtistSuggestions.loadAllArtists();
                 await CharacterSuggestions.loadAllCharacters();
+                await SeriesSuggestions.loadAllSeries();
             },
 
             handleCoverSelect: (e) => {
@@ -2349,6 +2535,7 @@
                 const tags = document.getElementById('upTags').value.split(',').map(t => t.trim()).filter(t => t);
                 const artists = document.getElementById('upArtists').value.split(',').map(t => t.trim()).filter(t => t);
                 const characters = document.getElementById('upCharacters').value.split(',').map(c => c.trim()).filter(c => c);
+                const series = document.getElementById('upSeries').value.split(',').map(s => s.trim()).filter(s => s);
                 
                 if (!UploadManager.coverFile && UploadManager.pageFiles.length === 0) return Toast.error(T('alert_no_cover'));
                 const coverBlob = UploadManager.coverFile || UploadManager.pageFiles[0].file;
@@ -2358,7 +2545,7 @@
                     if (UploadManager.editingId) {
                         // Update existing
                         galleryId = UploadManager.editingId;
-                        await db.galleries.update(galleryId, { title, tags, artists, characters, coverBlob, totalPages: UploadManager.pageFiles.length });
+                        await db.galleries.update(galleryId, { title, tags, artists, characters, series, coverBlob, totalPages: UploadManager.pageFiles.length });
                         
                         // Replace pages (delete old, insert current state)
                         await db.pages.where('galleryId').equals(galleryId).delete();
@@ -2369,17 +2556,18 @@
                         await FileSystemManager.syncToLocal(galleryId);
                     } else {
                         // Create new
-                        galleryId = await db.galleries.add({ title, tags, artists, characters, coverBlob, createdAt: new Date().toISOString(), isFavorite: false, totalPages: UploadManager.pageFiles.length });
+                        galleryId = await db.galleries.add({ title, tags, artists, characters, series, coverBlob, createdAt: new Date().toISOString(), isFavorite: false, totalPages: UploadManager.pageFiles.length });
                         const pagesToSave = UploadManager.pageFiles.map((p, index) => ({ galleryId, order: index, imageBlob: p.file, translations: [] }));
                         if(pagesToSave.length > 0) await db.pages.bulkAdd(pagesToSave);
                         Toast.success(T('alert_save_success'));
                         await FileSystemManager.syncToLocal(galleryId);
                     }
 
-                    // Reload suggestions with newly added/updated tags, artists, and characters
+                    // Reload suggestions with newly added/updated tags, artists, characters, and series
                     await TagSuggestions.loadAllTags();
                     await ArtistSuggestions.loadAllArtists();
                     await CharacterSuggestions.loadAllCharacters();
+                    await SeriesSuggestions.loadAllSeries();
                     
                     UI.navigate('detail', galleryId);
                 } catch (e) { Toast.error(T('alert_save_error') + e.message); }
@@ -2771,6 +2959,7 @@
                 document.getElementById('detTags').innerHTML = gallery.tags.length ? gallery.tags.map(t => UI.createTagBadge(t, 'tag')).join('') : `<span class="text-gray-500 text-sm">${T('no_tags')}</span>`;
                 document.getElementById('detArtists').innerHTML = gallery.artists.length ? gallery.artists.map(t => UI.createTagBadge(t, 'artist')).join('') : `<span class="text-gray-500 text-sm">${T('no_artists')}</span>`;
                 document.getElementById('detCharacters').innerHTML = (gallery.characters && gallery.characters.length) ? gallery.characters.map(c => UI.createTagBadge(c, 'character')).join('') : `<span class="text-gray-500 text-sm">${T('no_characters')}</span>`;
+                document.getElementById('detSeries').innerHTML = (gallery.series && gallery.series.length) ? gallery.series.map(s => UI.createTagBadge(s, 'series')).join('') : `<span class="text-gray-500 text-sm">${T('no_series')}</span>`;
                 document.getElementById('detDate').textContent = new Date(gallery.createdAt).toLocaleDateString('th-TH');
                 
                 Detail.updateFavoriteBtn();
@@ -2822,7 +3011,7 @@
                     const img = document.createElement('img');
                     img.src = imageUrl;
                     img.className = 'w-full h-full object-cover';
-                    img.loading = 'lazy';
+                    img.loading = 'lazy'; 
                     
                     previewDiv.appendChild(img);
                     grid.appendChild(previewDiv);
@@ -3998,6 +4187,7 @@
             TagSuggestions.init();
             ArtistSuggestions.init();
             CharacterSuggestions.init();
+            SeriesSuggestions.init();
             StateManager.load();
             FileSystemManager.init();
         };
