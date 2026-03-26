@@ -53,7 +53,7 @@
             border-radius: 6px;
             padding: 8px; /* Safe padding for dragging */
             box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-            resize: both;
+            /* resize: both; */ /* Native resizing removed for custom implementation */
             overflow: hidden;
             min-width: 60px; min-height: 40px;
             z-index: 50;
@@ -85,6 +85,24 @@
             display: none;
         }
         .trans-box:not(.view-only):hover .trans-box-delete { display: block; }
+
+        /* Custom Resize Handle */
+        .trans-box .resize-handle {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 15px; /* Larger for easier grabbing */
+            height: 15px;
+            background: #ed2553; /* nRed */
+            border-radius: 0 0 6px 0; /* Match box border-radius */
+            cursor: nwse-resize;
+            z-index: 52; /* Above delete button */
+            display: none; /* Hidden by default, shown on hover/selection */
+        }
+        .trans-box:not(.view-only):hover .resize-handle,
+        .trans-box.selected .resize-handle {
+            display: block;
+        }
 
         .trans-content {
             width: 100%; flex-grow: 1; outline: none; border: none; background: transparent;
@@ -2909,6 +2927,7 @@
                     box.innerHTML = `
                         <div class="trans-box-delete" title="ลบกล่องนี้"><i class="fa-solid fa-xmark"></i></div>
                         <div class="trans-content" contenteditable="true" spellcheck="false">${data.text}</div>
+                        <div class="resize-handle"></div> <!-- Add custom resize handle -->
                     `;
                     
                     const textarea = box.querySelector('.trans-content');
@@ -2925,6 +2944,9 @@
                         Reader.startOffsetY = e.clientY - boxRect.top;
                         e.stopPropagation();
                     });
+
+                    const resizeHandle = box.querySelector('.resize-handle');
+                    resizeHandle.addEventListener('mousedown', (e) => Reader.initResize(e, box, data));
 
                     textarea.addEventListener('focus', () => Reader.selectBox(box));
                     textarea.addEventListener('input', () => Reader.markUnsaved());
@@ -2943,6 +2965,51 @@
                     Reader.selectBox(box);
                     setTimeout(() => ta.focus(), 50);
                 }
+            },
+
+            initResize: (e, box, ov) => { // box is the DOM element, ov is the data object
+                e.preventDefault();
+                e.stopPropagation(); // Prevent drag from starting
+
+                const layer = document.getElementById('translationLayer');
+                const layerRect = layer.getBoundingClientRect();
+
+                // Get initial pixel dimensions of the box
+                const boxRect = box.getBoundingClientRect();
+                const startPixelW = boxRect.width;
+                const startPixelH = boxRect.height;
+
+                // Get initial mouse position
+                const startMouseX = e.clientX;
+                const startMouseY = e.clientY;
+
+                const doResize = (me) => {
+                    // Calculate pixel difference from start
+                    const deltaX = me.clientX - startMouseX;
+                    const deltaY = me.clientY - startMouseY;
+
+                    // Calculate new pixel width and height, applying minimums
+                    let newPixelW = Math.max(60, startPixelW + deltaX); // min-width: 60px from CSS
+                    let newPixelH = Math.max(40, startPixelH + deltaY); // min-height: 40px from CSS
+
+                    // Convert new pixel dimensions to percentages relative to the layer
+                    ov.w = (newPixelW / layerRect.width) * 100;
+                    ov.h = (newPixelH / layerRect.height) * 100;
+
+                    // Update the box's style directly for immediate visual feedback
+                    box.style.width = `${ov.w}%`;
+                    box.style.height = `${ov.h}%`;
+
+                    Reader.markUnsaved();
+                };
+
+                const stopResize = () => {
+                    window.removeEventListener('mousemove', doResize);
+                    window.removeEventListener('mouseup', stopResize);
+                };
+
+                window.addEventListener('mousemove', doResize);
+                window.addEventListener('mouseup', stopResize);
             },
 
             applyBoxStyle: (box) => {
