@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UrGal</title>
+    <title>UGal</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📕</text></svg>">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -57,7 +57,7 @@
             overflow: hidden;
             min-width: 60px; min-height: 40px;
             z-index: 50;
-            display: flex; flex-direction: column;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
         }
         .trans-box:not(.view-only) { border: 1px dashed rgba(237, 37, 83, 0.5); cursor: move; }
         .trans-box:not(.view-only):hover { border: 1px solid #ed2553; }
@@ -88,8 +88,10 @@
 
         .trans-content {
             width: 100%; flex-grow: 1; outline: none; border: none; background: transparent;
-            resize: none; font-family: inherit; line-height: 1.4;
-            cursor: text; /* Switch cursor back to text inside textarea */
+            font-family: inherit; line-height: 1.4;
+            cursor: text; display: flex; align-items: center; justify-content: center;
+            white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word;
+            padding: 4px; min-height: 100%;
         }
 
         /* Toast Notification Styles */
@@ -180,8 +182,8 @@
         <div class="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
             <div class="flex items-center gap-6">
                 <a href="#" onclick="UI.navigate('home')" class="text-xl font-bold flex items-center gap-2">
-                    <span class="text-nRed hover:scale-110 transition" data-i18n-title="home_title"><i class="fa-solid fa-book-open"></i> UrGal</span>
-                     <p class="hidden sm:block text-gray-400 text-sm" style="font-size: 12px;">V 0.2.5.1</p>
+                    <span class="text-nRed hover:scale-110 transition" data-i18n-title="home_title"><i class="fa-solid fa-book-open"></i> UGal</span>
+                     <p class="hidden sm:block text-gray-400 text-sm" style="font-size: 12px;">V 0.2.6</p>
                 </a>
                 <div class="hidden md:flex gap-4 text-sm font-semibold text-gray-300">
                     <a href="#" onclick="UI.navigate('home')" class="hover:text-nRed transition" data-i18n-title="home_title" data-i18n="home_page">หน้าหลัก</a>
@@ -225,7 +227,7 @@
                 <div onclick="UI.navigate('user')" class="w-8 h-8 bg-gray-600 hover:bg-nRed transition rounded-full flex items-center justify-center cursor-pointer text-white" data-i18n-title="profile_title" title="โปรไฟล์ & รายการโปรด">
                     <i class="fa-solid fa-user text-sm"></i>
                 </div>
-                <button onclick="document.getElementById('settingsModal').classList.remove('hide')" class="text-gray-400 hover:text-white transition" title="ตั้งค่า / Settings"><i class="fa-solid fa-gear"></i></button>
+                <button onclick="document.getElementById('settingsModal').classList.remove('hide')" class="text-gray-400 hover:text-white transition" data-i18n-title="mainmenu_setting"><i class="fa-solid fa-gear"></i></button>
             </div>
         </div>
     </nav>
@@ -338,7 +340,7 @@
                 <div class="w-full md:w-2/3">
                     <div class="flex justify-between items-start">
                         <h1 id="detTitle" class="text-3xl font-bold mb-4">Title Here</h1>
-                        <button id="btnFavorite" onclick="Detail.toggleFavorite()" class="text-2xl text-gray-500 hover:text-nRed transition" title="บันทึกรายการโปรด">
+                        <button id="btnFavorite" onclick="Detail.toggleFavorite()" class="text-2xl text-gray-500 hover:text-nRed transition" data-i18n-title="add_to_fav_list" title="บันทึกรายการโปรด">
                             <i class="fa-regular fa-heart"></i>
                         </button>
                     </div>
@@ -461,7 +463,7 @@
                                 <label class="text-xs text-gray-400" data-i18n="trans_sets_section">ชุดคำแปล:</label>
                                 <div class="flex gap-1">
                                     <select id="transSetSelector" onchange="TranslationManager.switchSet(this.value)" class="flex-grow bg-darkBg text-white border border-gray-600 rounded text-xs px-2 py-1.5 outline-none focus:border-nRed">
-                                        <option value="">ไม่มี</option>
+                                        <option value="" data-i18n="pagesett_none">ไม่มี</option>
                                     </select>
                                     <button onclick="TranslationManager.showNewSetDialog()" class="bg-nRed hover:bg-nRedHover px-2 py-1 rounded text-xs font-bold transition" data-i18n-title="new_trans_set_title" title="สร้างชุดแปลใหม่" data-i18n="addnewtranscollect">+ ชุดใหม่</button>
                                 </div>
@@ -477,7 +479,7 @@
             </div>
 
             <!-- Edit Mode Banner & Translation Format Toolbar -->
-            <div id="editModeBanner" class="hide w-full max-w-5xl bg-yellow-600 text-white p-2 rounded mb-4 shadow flex flex-col sm:flex-row justify-between items-center gap-2 sticky top-32 z-40">
+            <div id="editModeBanner" class="hide fixed bottom-0 left-1/2 -translate-x-1/2 max-w-5xl bg-yellow-600 text-white p-2 rounded shadow flex flex-col sm:flex-row justify-between items-center gap-2 z-40" style="width: 100%; max-width: calc(100% - 32px);">
                 <div class="text-sm">
                     <i class="fa-solid fa-pen-to-square"></i> <span data-i18n="edit_banner"><b>โหมดแก้ไข:</b> คลิกรูปเพื่อเพิ่มกล่อง, คลิกขอบกล่องเพื่อลาก</span>
                     <span id="unsavedWarning" class="text-red-900 font-bold ml-2 hide"><i class="fa-solid fa-triangle-exclamation"></i> <span data-i18n="unsaved_warning">ยังไม่ได้บันทึก!</span></span>
@@ -485,20 +487,20 @@
                 
                 <!-- Format Toolbar (Shows when a box is selected) -->
                 <div id="transToolbar" class="flex items-center gap-2 bg-yellow-700 p-1 rounded opacity-50 pointer-events-none transition-opacity flex-wrap">
-                    <button onclick="Reader.changeFormat('size', -2)" class="px-2 hover:bg-yellow-800 rounded" title="ลดขนาดตัวอักษร"><i class="fa-solid fa-a text-xs"></i></button>
+                    <button onclick="Reader.changeFormat('size', -2)" class="px-2 hover:bg-yellow-800 rounded" data-i18n-title="decrease_size_title" title="ลดขนาดตัวอักษร"><i class="fa-solid fa-a text-xs"></i></button>
                     <span id="tbSize" class="w-6 text-center text-xs">14</span>
-                    <button onclick="Reader.changeFormat('size', 2)" class="px-2 hover:bg-yellow-800 rounded" title="เพิ่มขนาดตัวอักษร"><i class="fa-solid fa-a text-lg"></i></button>
+                    <button onclick="Reader.changeFormat('size', 2)" class="px-2 hover:bg-yellow-800 rounded" data-i18n-title="increase_size_title" title="เพิ่มขนาดตัวอักษร"><i class="fa-solid fa-a text-lg"></i></button>
                     <div class="w-px h-4 bg-yellow-800 mx-1"></div>
-                    <button id="tbShapeRect" onclick="Reader.changeFormat('shape', 'rect')" class="px-2 py-0.5 hover:bg-yellow-800 rounded text-xs border border-white" title="สี่เหลี่ยม">▭</button>
+                    <button id="tbShapeRect" onclick="Reader.changeFormat('shape', 'rect')" class="px-2 py-0.5 hover:bg-yellow-800 rounded text-xs border border-white" data-i18n-title="shape_rect_title" title="สี่เหลี่ยม">▭</button>
                     <div class="w-px h-4 bg-yellow-800 mx-1"></div>
-                    <button onclick="Reader.changeFormat('bg', 'white')" class="w-5 h-5 rounded-full bg-white border border-gray-400" title="พื้นขาว"></button>
-                    <button onclick="Reader.changeFormat('bg', 'black')" class="w-5 h-5 rounded-full bg-black border border-gray-400" title="พื้นดำ"></button>
-                    <button onclick="Reader.changeFormat('bg', 'clear')" class="w-5 h-5 rounded-full bg-transparent border border-gray-400 relative overflow-hidden" title="พื้นใส">
+                    <button onclick="Reader.changeFormat('bg', 'white')" class="w-5 h-5 rounded-full bg-white border border-gray-400" data-i18n-title="bg_white_title" title="พื้นขาว"></button>
+                    <button onclick="Reader.changeFormat('bg', 'black')" class="w-5 h-5 rounded-full bg-black border border-gray-400" data-i18n-title="bg_black_title" title="พื้นดำ"></button>
+                    <button onclick="Reader.changeFormat('bg', 'clear')" class="w-5 h-5 rounded-full bg-transparent border border-gray-400 relative overflow-hidden" data-i18n-title="bg_clear_title" title="พื้นใส">
                         <div class="absolute inset-0 bg-[url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAOklEQVQYV2N89erVfwY0ICYmBiuE8UlgE2QVEI1E2QQ1EQSIsgmIJiI0ES3B1BfUfEA+gE8/UCQBAgCG6x2578y9vAAAAABJRU5ErkJggg==')]"></div>
                     </button>
                     <div class="w-px h-4 bg-yellow-800 mx-1"></div>
-                    <button onclick="Reader.changeFormat('color', 'black')" class="px-2 hover:bg-yellow-800 rounded font-bold text-black text-shadow-none" title="ตัวอักษรดำ">T</button>
-                    <button onclick="Reader.changeFormat('color', 'white')" class="px-2 hover:bg-yellow-800 rounded font-bold text-white text-shadow-black" title="ตัวอักษรขาว">T</button>
+                    <button onclick="Reader.changeFormat('color', 'black')" class="px-2 hover:bg-yellow-800 rounded font-bold text-black text-shadow-none" data-i18n-title="color_black_title" title="ตัวอักษรดำ">T</button>
+                    <button onclick="Reader.changeFormat('color', 'white')" class="px-2 hover:bg-yellow-800 rounded font-bold text-white text-shadow-black" data-i18n-title="color_white_title" title="ตัวอักษรขาว">T</button>
                 </div>
 
                 <button onclick="Reader.saveTranslations()" class="bg-white text-yellow-800 px-4 py-1.5 rounded text-sm font-bold hover:bg-gray-200 shadow" data-i18n="save_page_btn">บันทึกหน้านี้</button>
@@ -659,14 +661,15 @@
         // ================= I18N SYSTEM =================
         const I18N = {
             th: {
+                decrease_size_title: "ลดขนาดตัวอักษร", increase_size_title: "เพิ่มขนาดตัวอักษร", shape_rect_title: "สี่เหลี่ยม", bg_white_title: "พื้นขาว", bg_black_title: "พื้นดำ", bg_clear_title: "พื้นใส", color_black_title: "ตัวอักษรดำ", color_white_title: "ตัวอักษรขาว",
                 tags: "แท็ก", artists: "ศิลปิน", home_title: "หน้าแรก", home_page:"หน้าหลัก",
                 search_placeholder: "ค้นหา...", list_search_placeholder: "ค้นหารายการ...", random_title: "สุ่มเรื่องจากรายการนี้",
                 export_title: "ส่งออกข้อมูลทั้งหมด (Backup)", import_title: "นำเข้าข้อมูล (Restore)",
-                upload: "อัปโหลด", profile_title: "โปรไฟล์ & รายการโปรด",
+                upload: "อัปโหลด", profile_title: "โปรไฟล์ & รายการโปรด", add_to_fav_list:"บันทึกรายการโปรด",
                 latest_updates: "อัปเดตล่าสุด", favorites: '<i class="fa-solid fa-heart text-nRed"></i> รายการโปรด',
-                items_count: "รายการ", no_data: "ไม่พบข้อมูล",
+                items_count: "รายการ", no_data: "ไม่พบข้อมูล", mainmenu_setting:"ตั้งค่า",
                 no_data_search: 'ไม่พบข้อมูลที่ตรงกับ "{q}"', no_data_cat: 'ยังไม่มีข้อมูลในหมวดหมู่นี้',
-                read_progress: 'อ่านถึง {current}/{total}',
+                read_progress: 'อ่านถึง {current}/{total}', pagesett_none:"ไม่มี",
                 sort_newest: "ใหม่ - เก่า", sort_oldest: "เก่า - ใหม่",
                 sort_most_pages: "หน้าเยอะ", sort_least_pages: "หน้าน้อย", sort_az: "A - Z", sort_za: "Z - A",
                 list_header: "รายการ", all_tags: '<i class="fa-solid fa-tags"></i> แท็กทั้งหมด', all_artists: '<i class="fa-solid fa-users"></i> ศิลปินทั้งหมด',
@@ -697,14 +700,15 @@
                 addnewtranscollect: "+ ชุดใหม่",grid_edit_delete_title: "แก้ไข / ลบ",shape_rect: "สี่เหลี่ยม", delete_trans_sets_title: "ลบชุดคำแปล", delete_trans_sets: "ลบชุดคำแปล", delete_confirm_msg: "คุณแน่ใจหรือไม่ว่าต้องการลบชุดแปลที่เลือก?", delete_btn_text: "ลบ"
             },
             en: {
+                decrease_size_title: "Decrease text size", increase_size_title: "Increase text size", shape_rect_title: "Rectangle", bg_white_title: "White background", bg_black_title: "Black background", bg_clear_title: "Transparent background", color_black_title: "Black text", color_white_title: "White text",
                 tags: "Tags", artists: "Artists", home_title: "Home", home_page:"Home",
                 search_placeholder: "Search...", list_search_placeholder: "Search list...", random_title: "Random from list",
                 export_title: "Export All (Backup)", import_title: "Import Data (Restore)",
-                upload: "Upload", profile_title: "Profile & Favorites",
+                upload: "Upload", profile_title: "Profile & Favorites", add_to_fav_list:"Add to Favorites",
                 latest_updates: "Latest Updates", favorites: '<i class="fa-solid fa-heart text-nRed"></i> Favorites',
-                items_count: "Items", no_data: "No Data",
+                items_count: "Items", no_data: "No Data", mainmenu_setting:"Settings",
                 no_data_search: 'No results for "{q}"', no_data_cat: 'No data in this category',
-                read_progress: 'Read {current}/{total}',
+                read_progress: 'Read {current}/{total}', pagesett_none:"None",
                 sort_newest: "Newest - Oldest", sort_oldest: "Oldest - Newest",
                 sort_most_pages: "Most Pages", sort_least_pages: "Least Pages", sort_az: "A - Z", sort_za: "Z - A",
                 list_header: "List", all_tags: '<i class="fa-solid fa-tags"></i> All Tags', all_artists: '<i class="fa-solid fa-users"></i> All Artists',
@@ -735,14 +739,15 @@
                 addnewtranscollect: "+ New Set",grid_edit_delete_title: "Edit / Delete",shape_rect: "Rectangle", delete_trans_sets_title: "Delete Translation Sets", delete_trans_sets: "Delete Sets", delete_confirm_msg: "Are you sure you want to delete selected translation sets?", delete_btn_text: "Delete"
             },
             cn: {
+                decrease_size_title: "减小文字大小", increase_size_title: "增大文字大小", shape_rect_title: "矩形", bg_white_title: "白色背景", bg_black_title: "黑色背景", bg_clear_title: "透明背景", color_black_title: "黑色文字", color_white_title: "白色文字",
                 tags: "标签", artists: "作者", home_title: "首页", home_page:"主页",
                 search_placeholder: "搜索...", list_search_placeholder: "搜索列表...", random_title: "随机挑选",
                 export_title: "导出全部 (备份)", import_title: "导入数据 (还原)",
-                upload: "上传", profile_title: "个人中心",
+                upload: "上传", profile_title: "个人中心", add_to_fav_list:"加入收藏",
                 latest_updates: "最近更新", favorites: '<i class="fa-solid fa-heart text-nRed"></i> 我的收藏',
-                items_count: "个项目", no_data: "暂无数据",
+                items_count: "个项目", no_data: "暂无数据", mainmenu_setting:"设置",
                 no_data_search: '未找到 "{q}" 的相关结果', no_data_cat: '此分类下没有内容',
-                read_progress: '阅读进度 {current}/{total}',
+                read_progress: '阅读进度 {current}/{total}', pagesett_none:"无",
                 sort_newest: "最新 - 最旧", sort_oldest: "最旧 - 最新",
                 sort_most_pages: "页数最多", sort_least_pages: "页数最少", sort_az: "A - Z", sort_za: "Z - A",
                 list_header: "列表", all_tags: '<i class="fa-solid fa-tags"></i> 所有标签', all_artists: '<i class="fa-solid fa-users"></i> 所有作者',
@@ -773,14 +778,15 @@
                 addnewtranscollect: "+ 新建翻译集",grid_edit_delete_title: "编辑 / 删除",shape_rect: "矩形", delete_trans_sets_title: "删除翻译集", delete_trans_sets: "删除翻译集", delete_confirm_msg: "确定要删除选择的翻译集吗？", delete_btn_text: "删除"
             },
             jp: {
+                decrease_size_title: "テキストサイズを縮小", increase_size_title: "テキストサイズを拡大", shape_rect_title: "矩形", bg_white_title: "白い背景", bg_black_title: "黒い背景", bg_clear_title: "透明な背景", color_black_title: "黒いテキスト", color_white_title: "白いテキスト",
                 tags: "タグ", artists: "作者", home_title: "ホーム", home_page:"ホーム",
                 search_placeholder: "検索...", list_search_placeholder: "リストを検索...", random_title: "ランダムに表示",
                 export_title: "全データを書き出し", import_title: "データを読み込み",
-                upload: "アップロード", profile_title: "プロフィール",
+                upload: "アップロード", profile_title: "プロフィール", add_to_fav_list:"お気に入りに追加",
                 latest_updates: "最近の更新", favorites: '<i class="fa-solid fa-heart text-nRed"></i> お気に入り',
-                items_count: "アイテム", no_data: "データがありません",
+                items_count: "アイテム", no_data: "データがありません", mainmenu_setting:"設定",
                 no_data_search: '"{q}" に一致する結果はありません', no_data_cat: 'このカテゴリは空です',
-                read_progress: '{current}/{total} ページ',
+                read_progress: '{current}/{total} ページ', pagesett_none:"なし",
                 sort_newest: "新しい順", sort_oldest: "古い順",
                 sort_most_pages: "ページ多い順", sort_least_pages: "ページ少ない順", sort_az: "A - Z", sort_za: "Z - A",
                 list_header: "リスト", all_tags: '<i class="fa-solid fa-tags"></i> すべてのタグ', all_artists: '<i class="fa-solid fa-users"></i> すべての作者',
@@ -821,7 +827,7 @@
         }
 
         // ================= DATABASE (Dexie.js) v3 =================
-        const db = new Dexie("UrgalDB");
+        const db = new Dexie("UGalDB");
         db.version(5).stores({
             galleries: '++id, title, createdAt, isFavorite, lastReadPage, totalPages',
             pages: '++id, galleryId, order',
@@ -886,11 +892,11 @@
                     webtoonScrollY: App.reader.webtoonScrollY,
                     scrollPositions: App.scrollPositions
                 };
-                localStorage.setItem('UrgalState', JSON.stringify(stateToSave));
+                localStorage.setItem('UGalState', JSON.stringify(stateToSave));
             },
             load: async () => {
                 // 1. Set language from storage
-                const savedState = JSON.parse(localStorage.getItem('UrgalState'));
+                const savedState = JSON.parse(localStorage.getItem('UGalState'));
                 if (savedState && savedState.lang) {
                     App.lang = savedState.lang;
                     document.getElementById('langSelect').value = App.lang;
@@ -1728,7 +1734,7 @@
                         pages: pagesWithBase64
                     };
 
-                    DataManager.downloadJSON(data, `UrGal-gallery-${g.title.substring(0, 20)}.json`);
+                    DataManager.downloadJSON(data, `UGal-gallery-${g.title.substring(0, 20)}.json`);
                 } catch(e) { Toast.error('เกิดข้อผิดพลาดในการส่งออก: ' + e.message); }
             },
 
@@ -1749,7 +1755,7 @@
                     }
 
                     const backup = { type: 'full_backup', data: allData, date: new Date().toISOString() };
-                    DataManager.downloadJSON(backup, `UrGal-full-backup-${Date.now()}.json`);
+                    DataManager.downloadJSON(backup, `UGal-full-backup-${Date.now()}.json`);
                 } catch(e) { Toast.error('เกิดข้อผิดพลาด: ' + e.message); }
             },
 
@@ -2360,10 +2366,10 @@
                 } else {
                     box.innerHTML = `
                         <div class="trans-box-delete" title="ลบกล่องนี้"><i class="fa-solid fa-xmark"></i></div>
-                        <textarea class="trans-content" placeholder="พิมพ์...">${data.text}</textarea>
+                        <div class="trans-content" contenteditable="true" spellcheck="false">${data.text}</div>
                     `;
                     
-                    const textarea = box.querySelector('textarea');
+                    const textarea = box.querySelector('.trans-content');
                     
                     // Box interactions
                     box.addEventListener('mousedown', (e) => {
@@ -2398,7 +2404,7 @@
             },
 
             applyBoxStyle: (box) => {
-                const ta = box.querySelector('textarea');
+                const ta = box.querySelector('.trans-content');
                 const target = ta || box; // if view-only, apply to box text directly
                 
                 // Font Size
@@ -2487,7 +2493,7 @@
                 const translations = [];
                 boxes.forEach(box => {
                     const boxRect = box.getBoundingClientRect();
-                    const text = box.querySelector('.trans-content') ? box.querySelector('.trans-content').value : box.innerText;
+                    const text = box.querySelector('.trans-content') ? box.querySelector('.trans-content').innerText : box.innerText;
                     if (text.trim() === '') return;
 
                     translations.push({
@@ -2564,7 +2570,12 @@
                 document.getElementById('newTransSetName').value = '';
                 
                 TranslationManager.loadTranslationSets();
-                Reader.renderTranslations();
+                
+                if (App.reader.readMode === 'webtoon') {
+                    App.pages.forEach((_, index) => Reader.renderTranslationsForPage(index));
+                } else {
+                    Reader.renderTranslations();
+                }
             },
 
             loadTranslationSets: async () => {
@@ -2574,7 +2585,7 @@
                 const selector = document.getElementById('transSetSelector');
                 if (!selector) return;
                 
-                selector.innerHTML = '<option value="">ไม่มี</option>';
+                selector.innerHTML = `<option value="" data-i18n="pagesett_none">${T('pagesett_none')}</option>`;
                 sets.forEach(set => {
                     const option = document.createElement('option');
                     option.value = set.id;
@@ -2600,11 +2611,7 @@
                 }
                 
                 StateManager.save();
-                Reader.renderTranslations();
-            },
-
-            switchSet: async (setId) => {
-                await TranslationManager.baseSwitchSet(setId);
+                
                 if (App.reader.readMode === 'webtoon') {
                     App.pages.forEach((_, index) => Reader.renderTranslationsForPage(index));
                 } else {
@@ -2618,7 +2625,7 @@
                 list.innerHTML = '';
                 
                 if (App.reader.availableTranslationSets.length === 0) {
-                    list.innerHTML = '<p class="text-gray-400 text-sm px-2 py-4">ไม่มีชุดแปล</p>';
+                    list.innerHTML = `<p class="text-gray-400 text-sm px-2 py-4" data-i18n="no_data_simple">${T('no_data_simple')}</p>`;
                     document.getElementById('exportTransSetModal').classList.remove('hide');
                     return;
                 }
@@ -2763,7 +2770,7 @@
                 list.innerHTML = '';
                 
                 if (App.reader.availableTranslationSets.length === 0) {
-                    list.innerHTML = '<p class="text-gray-400 text-sm px-2 py-4">ไม่มีชุดแปล</p>';
+                    list.innerHTML = `<p class="text-gray-400 text-sm px-2 py-4" data-i18n="no_data_simple">${T('no_data_simple')}</p>`;
                     document.getElementById('deleteTransSetModal').classList.remove('hide');
                     return;
                 }
@@ -2883,14 +2890,14 @@
 
         document.addEventListener('keydown', (e) => {
             if (App.currentView !== 'reader') return;
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return; // Ignore if typing
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return; // Ignore if typing
             
             if (App.reader.readMode === 'single') {
                 if (e.key === 'ArrowRight' || e.key === 'd') Reader.nextPage();
                 if (e.key === 'ArrowLeft' || e.key === 'a') Reader.prevPage();
             }
             // Add Backspace for back navigation, but prevent it on input fields
-            if (e.key === 'Backspace' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') history.back();
+            if (e.key === 'Backspace') history.back();
         });
 
         window.addEventListener('resize', () => {
