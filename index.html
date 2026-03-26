@@ -170,6 +170,25 @@
         .toast.removing {
             animation: slideOut 0.3s ease-in forwards;
         }
+
+        /* Detail Preview Grid Optimization */
+        #detPagesGrid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 8px;
+        }
+
+        #detPagesGrid > div {
+            max-height: 200px;
+            overflow: hidden;
+        }
+
+        #detPagesGrid img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -183,7 +202,7 @@
             <div class="flex items-center gap-6">
                 <a href="#" onclick="UI.navigate('home')" class="text-xl font-bold flex items-center gap-2">
                     <span class="text-nRed hover:scale-110 transition" data-i18n-title="home_title"><i class="fa-solid fa-book-open"></i> UGal</span>
-                     <p class="hidden sm:block text-gray-400 text-sm" style="font-size: 12px;">V 0.2.7</p>
+                     <p class="hidden sm:block text-gray-400 text-sm" style="font-size: 12px;">V 0.2.8</p>
                 </a>
                 <div class="hidden md:flex gap-4 text-sm font-semibold text-gray-300">
                     <a href="#" onclick="UI.navigate('home')" class="hover:text-nRed transition" data-i18n-title="home_title" data-i18n="home_page">หน้าหลัก</a>
@@ -323,9 +342,19 @@
                         <input type="file" id="pagesInput" accept="image/*,application/pdf" multiple class="hidden" onchange="UploadManager.handlePagesSelect(event)">
                     </div>
 
+                    <div id="uploadProgressContainer" class="hide mb-4 p-4 bg-darkBg rounded-lg border border-yellow-600/50">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium text-yellow-500">กำลังประมวลผล PDF...</span>
+                            <span id="uploadProgressText" class="text-sm text-gray-400">0/0</span>
+                        </div>
+                        <div class="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
+                            <div id="uploadProgressBar" class="bg-yellow-500 h-full w-0 transition-all duration-300"></div>
+                        </div>
+                    </div>
                     <div id="dropZonePages" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 bg-darkBg p-4 rounded min-h-[200px] hover:bg-darkCard border-2 border-dashed border-gray-700 transition">
                         <!-- Items -->
                     </div>
+                    <div id="uploadPaginationContainer" class="flex justify-center gap-2 mt-4 flex-wrap"></div>
                 </div>
 
                 <div class="mt-8 flex justify-end gap-3">
@@ -405,6 +434,7 @@
             <div class="bg-darkCard p-6 rounded-lg">
                 <h3 class="text-xl font-bold mb-4 border-b border-gray-700 pb-2">พรีวิว (Pages)</h3>
                 <div id="detPagesGrid" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3"></div>
+                <div id="detail-pages-pagination" class="flex justify-center gap-2 mt-8 flex-wrap"></div>
             </div>
         </div>
 
@@ -851,6 +881,11 @@
             searchQuery: '',
             currentNavParams: null, // Will be updated by router
             scrollPositions: {}, // Store scroll positions for all views (key: viewKey, value: scrollY)
+            detail: {
+                currentPage: 1,
+                itemsPerPage: 21,
+                previewUrls: [] // Track URLs for cleanup
+            },
             reader: {
                 currentIndex: 0,
                 isEditMode: false,
@@ -889,6 +924,7 @@
                     navParams: App.currentNavParams,
                     gridSort: Grid.currentSort,
                     gridPage: Grid.currentPage,
+                    detailPage: App.detail.currentPage,
                     currentTranslationSetId: App.reader.currentTranslationSetId,
                     readMode: App.reader.readMode,
                     imgFitType: App.reader.imgFitType,
@@ -913,6 +949,9 @@
                 }
                 if (savedState && savedState.gridPage) {
                     Grid.currentPage = savedState.gridPage;
+                }
+                if (savedState && savedState.detailPage) {
+                    App.detail.currentPage = savedState.detailPage;
                 }
                 if (savedState && savedState.readMode) {
                     App.reader.readMode = savedState.readMode;
@@ -991,6 +1030,7 @@
                 App.reader.hasUnsavedChanges = false;
 
                 Grid.currentPage = 1; // Reset pagination on new navigation
+                if (viewName === 'detail') App.detail.currentPage = 1; // Reset detail pagination on new navigation
 
                 const state = { view: viewName, params: params };
                 const url = UI.stateToUrl(state);
@@ -1355,8 +1395,8 @@
                 }
             },
 
-            // แปลง PDF file เป็น array ของ image blobs
-            convertPDFToImages: async (pdfFile) => {
+            // แปลง PDF file เป็น array ของ image blobs พร้อมสนับสนุน callback สำหรับแต่ละ page
+            convertPDFToImages: async (pdfFile, onPageProcessed = null) => {
                 return new Promise((resolve, reject) => {
                     const fileReader = new FileReader();
                     
@@ -1370,6 +1410,7 @@
                             const pdfData = new Uint8Array(e.target.result);
                             const pdfDocument = await pdfjsLib.getDocument({ data: pdfData }).promise;
                             const imageBlobs = [];
+                            let completedPages = 0;
                             
                             // Loop ทุกหน้า
                             for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
@@ -1389,25 +1430,29 @@
                                     viewport: viewport
                                 }).promise;
                                 
-                                // แปลง canvas เป็น blob
+                                // แปลง canvas เป็น blob และทำการ callback ทันที
                                 canvas.toBlob((blob) => {
                                     if (blob) {
-                                        imageBlobs.push({
+                                        const imageData = {
                                             blob: blob,
                                             pageNum: pageNum,
                                             fileName: `page_${pageNum}.png`
-                                        });
+                                        };
+                                        imageBlobs.push(imageData);
+                                        completedPages++;
+                                        
+                                        // เรียก callback ถ้ามี เพื่อแสดงความคืบหน้า
+                                        if (onPageProcessed) {
+                                            onPageProcessed(imageData, completedPages, pdfDocument.numPages);
+                                        }
+                                        
+                                        // ถ้าเสร็จทั้งหมด ให้ resolve
+                                        if (completedPages === pdfDocument.numPages) {
+                                            resolve(imageBlobs);
+                                        }
                                     }
                                 }, 'image/png', 0.95); // คุณภาพ 95% 
                             }
-                            
-                            // รอให้ทุก blob พร้อม
-                            const interval = setInterval(() => {
-                                if (imageBlobs.length === pdfDocument.numPages) {
-                                    clearInterval(interval);
-                                    resolve(imageBlobs);
-                                }
-                            }, 10);
                             
                         } catch (error) {
                             reject(error);
@@ -1728,6 +1773,8 @@
             coverFile: null,
             pageFiles: [],
             editingId: null,
+            currentUploadPage: 1,
+            itemsPerPageUpload: 32,
 
             initDragAndDrop: () => {
                 const setupZone = (id, inputId, callback) => {
@@ -1746,6 +1793,7 @@
 
             reset: () => {
                 UploadManager.editingId = null;
+                UploadManager.currentUploadPage = 1;
                 document.getElementById('upTitle').value = '';
                 // Header reset handled in UI.navigate
                 document.getElementById('upTags').value = '';
@@ -1757,6 +1805,15 @@
                 
                 UploadManager.pageFiles.forEach(p => URL.revokeObjectURL(p.url));
                 UploadManager.pageFiles = [];
+                
+                // Hide progress indicator
+                const progressContainer = document.getElementById('uploadProgressContainer');
+                if (progressContainer) {
+                    progressContainer.classList.add('hide');
+                    document.getElementById('uploadProgressBar').style.width = '0%';
+                    document.getElementById('uploadProgressText').textContent = '0/0';
+                }
+                
                 UploadManager.renderPagesGrid();
                 TagSuggestions.hideSuggestions();
                 ArtistSuggestions.hideSuggestions();
@@ -1805,59 +1862,149 @@
 
             handlePagesSelect: async (e) => {
                 const files = Array.from(e.target.files);
+                let hasImages = false;
+                let hasPDF = false;
                 
+                // First pass: add regular images immediately
                 for (const file of files) {
-                    // ถ้าเป็นรูปภาพ
                     if (file.type.startsWith('image/')) {
                         UploadManager.pageFiles.push({
                             id: Date.now() + Math.random(),
                             file: file,
                             url: URL.createObjectURL(file)
                         });
-                    }
-                    // ถ้าเป็น PDF
-                    else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
-                        try {
-                            // แปลง PDF เป็นรูปภาพ
-                            const imageBlobs = await PDFConverter.convertPDFToImages(file);
-                            
-                            // เพิ่มแต่ละ page เป็น file ใน pageFiles
-                            imageBlobs.forEach((item, idx) => {
-                                UploadManager.pageFiles.push({
-                                    id: Date.now() + Math.random() + idx,
-                                    file: new File([item.blob], item.fileName, { type: 'image/png' }),
-                                    url: URL.createObjectURL(item.blob)
-                                });
-                            });
-                        } catch (error) {
-                            console.error('Error converting PDF:', error);
-                            Toast.error('เกิดข้อผิดพลาดในการแปลง PDF: ' + error.message);
-                        }
+                        hasImages = true;
+                    } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+                        hasPDF = true;
                     }
                 }
                 
-                UploadManager.renderPagesGrid();
+                // Show initial grid if there are images
+                if (hasImages) {
+                    UploadManager.currentUploadPage = 1; // Reset to page 1
+                    UploadManager.renderPagesGrid();
+                }
+                
+                // Second pass: process PDFs with progress indicator
+                if (hasPDF) {
+                    const progressContainer = document.getElementById('uploadProgressContainer');
+                    const progressBar = document.getElementById('uploadProgressBar');
+                    const progressText = document.getElementById('uploadProgressText');
+                    progressContainer.classList.remove('hide');
+                    
+                    for (const file of files) {
+                        if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+                            try {
+                                // แปลง PDF เป็นรูปภาพ พร้อม progress callback
+                                await PDFConverter.convertPDFToImages(file, (imageData, completed, total) => {
+                                    // เพิ่มรูปไปยัง pageFiles ทันที
+                                    UploadManager.pageFiles.push({
+                                        id: Date.now() + Math.random() + completed,
+                                        file: new File([imageData.blob], imageData.fileName, { type: 'image/png' }),
+                                        url: URL.createObjectURL(imageData.blob)
+                                    });
+                                    
+                                    // อัปเดต progress bar
+                                    const percentage = (completed / total) * 100;
+                                    progressBar.style.width = percentage + '%';
+                                    progressText.textContent = `${completed}/${total}`;
+                                    
+                                    // เรนเดอร์ grid เพื่อแสดงรูปที่แปลงเสร็จแล้ว
+                                    UploadManager.currentUploadPage = 1; // Reset to page 1
+                                    UploadManager.renderPagesGrid();
+                                });
+                            } catch (error) {
+                                console.error('Error converting PDF:', error);
+                                Toast.error('เกิดข้อผิดพลาดในการแปลง PDF: ' + error.message);
+                            }
+                        }
+                    }
+                    
+                    // ซ่อน progress indicator เมื่อเสร็จ
+                    progressContainer.classList.add('hide');
+                    progressBar.style.width = '0%';
+                    progressText.textContent = '0/0';
+                }
+                
                 if(e.target.id === 'pagesInput') e.target.value = '';
+            },
+
+            changeUploadPage: (newPage) => {
+                const totalPages = Math.ceil(UploadManager.pageFiles.length / UploadManager.itemsPerPageUpload);
+                if (newPage < 1 || newPage > totalPages) return;
+                UploadManager.currentUploadPage = newPage;
+                UploadManager.renderPagesGrid();
+                // Scroll to top of grid
+                const grid = document.getElementById('dropZonePages');
+                if (grid) grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
             },
 
             renderPagesGrid: () => {
                 const grid = document.getElementById('dropZonePages');
+                const paginationContainer = document.getElementById('uploadPaginationContainer');
                 grid.innerHTML = '';
-                UploadManager.pageFiles.forEach((page, index) => {
+                paginationContainer.innerHTML = '';
+                
+                const totalPages = Math.ceil(UploadManager.pageFiles.length / UploadManager.itemsPerPageUpload);
+                const start = (UploadManager.currentUploadPage - 1) * UploadManager.itemsPerPageUpload;
+                const end = start + UploadManager.itemsPerPageUpload;
+                const itemsToShow = UploadManager.pageFiles.slice(start, end);
+
+                itemsToShow.forEach((page, displayIndex) => {
+                    const actualIndex = start + displayIndex;
                     grid.innerHTML += `
                         <div class="relative group rounded overflow-hidden aspect-a4 bg-gray-800 border border-gray-600">
-                            <span class="absolute top-1 left-1 bg-black/70 text-white text-xs px-1.5 rounded z-10">${index + 1}</span>
-                            <button onclick="UploadManager.removePage(${index})" class="absolute top-1 right-1 bg-red-600 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition z-10"><i class="fa-solid fa-xmark"></i></button>
+                            <span class="absolute top-1 left-1 bg-black/70 text-white text-xs px-1.5 rounded z-10">${actualIndex + 1}</span>
+                            <button onclick="UploadManager.removePage(${actualIndex})" class="absolute top-1 right-1 bg-red-600 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition z-10"><i class="fa-solid fa-xmark"></i></button>
                             <img src="${page.url}" class="w-full h-full object-cover pointer-events-none">
                             <div class="absolute bottom-0 left-0 right-0 bg-black/60 p-1 flex justify-between opacity-0 group-hover:opacity-100 transition">
-                                <button onclick="UploadManager.movePage(${index}, -1)" class="text-white hover:text-nRed text-sm p-1" ${index === 0 ? 'disabled class="opacity-30"' : ''}><i class="fa-solid fa-arrow-left"></i></button>
-                                <button onclick="UploadManager.movePage(${index}, 1)" class="text-white hover:text-nRed text-sm p-1" ${index === UploadManager.pageFiles.length - 1 ? 'disabled class="opacity-30"' : ''}><i class="fa-solid fa-arrow-right"></i></button>
+                                <button onclick="UploadManager.movePage(${actualIndex}, -1)" class="text-white hover:text-nRed text-sm p-1" ${actualIndex === 0 ? 'disabled class="opacity-30"' : ''}><i class="fa-solid fa-arrow-left"></i></button>
+                                <button onclick="UploadManager.movePage(${actualIndex}, 1)" class="text-white hover:text-nRed text-sm p-1" ${actualIndex === UploadManager.pageFiles.length - 1 ? 'disabled class="opacity-30"' : ''}><i class="fa-solid fa-arrow-right"></i></button>
                             </div>
                         </div>
                     `;
                 });
+                
                 if(UploadManager.pageFiles.length === 0){
                     grid.innerHTML = `<div class="col-span-full flex flex-col items-center justify-center text-gray-500 min-h-[150px] pointer-events-none"><i class="fa-solid fa-images text-4xl mb-2"></i><p data-i18n="pages_placeholder">${T('pages_placeholder')}</p></div>`;
+                } else if (totalPages > 1) {
+                    // Render pagination controls in separate container
+                    // Previous button
+                    const prevBtn = document.createElement('button');
+                    prevBtn.className = `px-3 py-1 rounded text-sm ${
+                        UploadManager.currentUploadPage === 1 
+                            ? 'bg-gray-700 text-gray-500 cursor-default' 
+                            : 'bg-gray-700 hover:bg-gray-600 text-white transition'
+                    }`;
+                    prevBtn.innerHTML = '<i class="fa-solid fa-chevron-left"></i>';
+                    prevBtn.disabled = UploadManager.currentUploadPage === 1;
+                    prevBtn.onclick = () => UploadManager.changeUploadPage(UploadManager.currentUploadPage - 1);
+                    paginationContainer.appendChild(prevBtn);
+                    
+                    // Page buttons
+                    for (let i = 1; i <= totalPages; i++) {
+                        const pageBtn = document.createElement('button');
+                        pageBtn.className = `px-3 py-1 rounded text-sm ${
+                            i === UploadManager.currentUploadPage
+                                ? 'bg-nRed text-white font-bold'
+                                : 'bg-gray-700 hover:bg-gray-600 text-white transition'
+                        }`;
+                        pageBtn.textContent = i;
+                        pageBtn.onclick = () => UploadManager.changeUploadPage(i);
+                        paginationContainer.appendChild(pageBtn);
+                    }
+                    
+                    // Next button
+                    const nextBtn = document.createElement('button');
+                    nextBtn.className = `px-3 py-1 rounded text-sm ${
+                        UploadManager.currentUploadPage === totalPages 
+                            ? 'bg-gray-700 text-gray-500 cursor-default' 
+                            : 'bg-gray-700 hover:bg-gray-600 text-white transition'
+                    }`;
+                    nextBtn.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
+                    nextBtn.disabled = UploadManager.currentUploadPage === totalPages;
+                    nextBtn.onclick = () => UploadManager.changeUploadPage(UploadManager.currentUploadPage + 1);
+                    paginationContainer.appendChild(nextBtn);
                 }
             },
 
@@ -2162,13 +2309,92 @@
                 // Load translation sets
                 await TranslationManager.loadTranslationSets();
 
+                Detail.renderPagesWithPagination();
+                Detail.updateReadButton();
+            },
+            renderPagesWithPagination: () => {
                 const grid = document.getElementById('detPagesGrid');
+                const pagination = document.getElementById('detail-pages-pagination');
+                
                 grid.innerHTML = '';
-                pages.forEach((page, index) => {
-                    grid.innerHTML += `<div class="aspect-a4 bg-gray-800 rounded overflow-hidden cursor-pointer hover:ring-2 hover:ring-nRed transition" onclick="UI.navigate('reader', { galleryId: ${id}, index: ${index} })"><img src="${URL.createObjectURL(page.imageBlob)}" class="w-full h-full object-cover"></div>`;
+                if(pagination) pagination.innerHTML = '';
+
+                if (!App.pages || App.pages.length === 0) return;
+
+                // Revoke old preview URLs to free memory
+                App.detail.previewUrls.forEach(url => URL.revokeObjectURL(url));
+                App.detail.previewUrls = [];
+
+                // Pagination Logic
+                const totalPages = Math.ceil(App.pages.length / App.detail.itemsPerPage);
+                if (App.detail.currentPage > totalPages) App.detail.currentPage = 1;
+
+                const start = (App.detail.currentPage - 1) * App.detail.itemsPerPage;
+                const end = start + App.detail.itemsPerPage;
+                const itemsToShow = App.pages.slice(start, end);
+
+                // Render images directly (faster than compression)
+                itemsToShow.forEach((page, index) => {
+                    const actualIndex = start + index;
+                    const imageUrl = URL.createObjectURL(page.imageBlob);
+                    App.detail.previewUrls.push(imageUrl);
+                    
+                    const previewDiv = document.createElement('div');
+                    previewDiv.className = 'aspect-a4 bg-gray-800 rounded overflow-hidden cursor-pointer hover:ring-2 hover:ring-nRed transition';
+                    previewDiv.onclick = () => UI.navigate('reader', { galleryId: App.currentGalleryId, index: actualIndex });
+                    
+                    const img = document.createElement('img');
+                    img.src = imageUrl;
+                    img.className = 'w-full h-full object-cover';
+                    img.loading = 'lazy';
+                    
+                    previewDiv.appendChild(img);
+                    grid.appendChild(previewDiv);
                 });
 
-                Detail.updateReadButton();
+                // Render Pagination Controls
+                if (totalPages > 1 && pagination) {
+                    let html = '';
+                    // Prev Button
+                    html += `<button onclick="Detail.changePage(${Math.max(1, App.detail.currentPage - 1)})" class="w-8 h-8 rounded bg-gray-700 hover:bg-gray-600 flex items-center justify-center disabled:opacity-50 text-white" ${App.detail.currentPage === 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button>`;
+
+                    const generateBtn = (i) => {
+                        const active = i === App.detail.currentPage ? 'bg-nRed text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600';
+                        return `<button onclick="Detail.changePage(${i})" class="w-8 h-8 rounded ${active} font-bold text-sm">${i}</button>`;
+                    };
+
+                    if (totalPages <= 12) {
+                        for (let i = 1; i <= totalPages; i++) html += generateBtn(i);
+                    } else {
+                        if (App.detail.currentPage <= 10) {
+                            for (let i = 1; i <= 12; i++) html += generateBtn(i);
+                            html += `<span class="px-1 text-gray-500 self-center">...</span>`;
+                            html += generateBtn(totalPages);
+                        } else if (App.detail.currentPage >= totalPages - 9) {
+                            html += generateBtn(1);
+                            html += `<span class="px-1 text-gray-500 self-center">...</span>`;
+                            for (let i = totalPages - 11; i <= totalPages; i++) html += generateBtn(i);
+                        } else {
+                            html += generateBtn(1);
+                            html += `<span class="px-1 text-gray-500 self-center">...</span>`;
+                            for (let i = App.detail.currentPage - 5; i <= App.detail.currentPage + 5; i++) html += generateBtn(i);
+                            html += `<span class="px-1 text-gray-500 self-center">...</span>`;
+                            html += generateBtn(totalPages);
+                        }
+                    }
+
+                    // Next Button
+                    html += `<button onclick="Detail.changePage(${Math.min(totalPages, App.detail.currentPage + 1)})" class="w-8 h-8 rounded bg-gray-700 hover:bg-gray-600 flex items-center justify-center disabled:opacity-50 text-white" ${App.detail.currentPage === totalPages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button>`;
+                    
+                    pagination.innerHTML = html;
+                }
+            },
+            changePage: (newPage) => {
+                const currentScroll = window.scrollY;
+                App.detail.currentPage = newPage;
+                Detail.renderPagesWithPagination();
+                window.scrollTo(0, currentScroll);
+                StateManager.save();
             },
             updateFavoriteBtn: () => {
                 const btn = document.getElementById('btnFavorite');
