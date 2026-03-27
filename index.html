@@ -249,7 +249,7 @@
             <div class="flex items-center gap-6">
                 <a href="#" onclick="UI.navigate('home')" class="text-xl font-bold flex items-center gap-2">
                     <span class="text-nRed hover:scale-110 transition" data-i18n-title="home_title"><i class="fa-solid fa-book-open"></i> UGal</span>
-                     <p class="hidden sm:block text-gray-400 text-sm" style="font-size: 12px;">V 0.3.0</p>
+                     <p class="hidden sm:block text-gray-400 text-sm" style="font-size: 12px;">V 0.3.1</p>
                 </a>
                 <div class="hidden md:flex gap-4 text-sm font-semibold text-gray-300">
                     <a href="#" onclick="UI.navigate('home')" class="hover:text-nRed transition" data-i18n-title="home_title" data-i18n="home_page">หน้าหลัก</a>
@@ -437,7 +437,7 @@
                 </div>
                 <div class="w-full md:w-2/3">
                     <div class="flex justify-between items-start">
-                        <h1 id="detTitle" class="text-3xl font-bold mb-4">Title Here</h1>
+                        <h1 id="detTitle" class="text-3xl font-bold mb-4 line-clamp-3">Title Here</h1>
                         <button id="btnFavorite" onclick="Detail.toggleFavorite()" class="text-2xl text-gray-500 hover:text-nRed transition" data-i18n-title="add_to_fav_list" title="บันทึกรายการโปรด">
                             <i class="fa-regular fa-heart"></i>
                         </button>
@@ -1452,14 +1452,14 @@
                         grid.innerHTML += `
                             <div class="gallery-card bg-darkCard rounded overflow-hidden shadow cursor-pointer relative group" onclick="UI.navigate('detail', ${g.id})">
                                 <div class="aspect-a4 overflow-hidden relative">
-                                    <img src="${coverUrl}" class="cover-img w-full h-full object-cover">
+                                    <img src="${coverUrl}" class="cover-img w-full h-full object-cover" title="${g.title}">
                                     ${Grid.isEditMode ? `<button onclick="Grid.deleteItem(${g.id}, event)" class="absolute top-0 right-0 bg-red-600 text-white w-8 h-8 flex items-center justify-center z-20 hover:bg-red-700 transition shadow-md rounded-bl-lg"><i class="fa-solid fa-xmark"></i></button>` : ''}
                                     <div class="absolute top-2 right-2 flex flex-col gap-1 items-end">
                                         ${g.isFavorite ? '<div class="text-nRed text-lg shadow-black drop-shadow-md"><i class="fa-solid fa-heart"></i></div>' : ''}
                                         ${(hasProgress && !isFinished) ? '<div class="text-yellow-400 text-lg shadow-black drop-shadow-md"><i class="fa-solid fa-bookmark"></i></div>' : ''}
                                     </div>
-                                    <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-2 pt-6">
-                                        <div class="text-white text-xs font-bold truncate">${g.title}</div>
+                                    <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-2 pt-6" title="${g.title}">
+                                        <div class="text-white text-xs font-bold line-clamp-3">${g.title}</div>
                                         ${(hasProgress && !isFinished) ? `<div class="text-yellow-400 text-[10px] font-bold mt-1"><i class="fa-solid fa-book-open"></i> ${progressText}</div>` : ''}
                                     </div>
                                 </div>
