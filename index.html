@@ -249,7 +249,7 @@
             <div class="flex items-center gap-6">
                 <a href="#" onclick="UI.navigate('home')" class="text-xl font-bold flex items-center gap-2">
                     <span class="text-nRed hover:scale-110 transition" data-i18n-title="home_title"><i class="fa-solid fa-book-open"></i> UGal</span>
-                     <p class="hidden sm:block text-gray-400 text-sm" style="font-size: 12px;">V 0.3.3</p>
+                     <p class="hidden sm:block text-gray-400 text-sm" style="font-size: 12px;">V 0.3.4</p>
                 </a>
                 <div class="hidden md:flex gap-4 text-sm font-semibold text-gray-300">
                     <a href="#" onclick="UI.navigate('home')" class="hover:text-nRed transition" data-i18n-title="home_title" data-i18n="home_page">หน้าหลัก</a>
@@ -318,6 +318,8 @@
                         <option value="least_pages" data-i18n="sort_least_pages">หน้าน้อย</option>
                         <option value="az" data-i18n="sort_az">A - Z</option>
                         <option value="za" data-i18n="sort_za">Z - A</option>
+                        <option value="last_read_newest" data-i18n="sort_last_read_newest">อ่านล่าสุด</option>
+                        <option value="last_read_oldest" data-i18n="sort_last_read_oldest">อ่านนานแล้ว</option>
                     </select>
                     <span id="gridCount" class="text-gray-400 text-sm">0 รายการ</span>
                 </div>
@@ -841,6 +843,7 @@
                 read_progress: 'อ่านถึง {current}/{total}', pagesett_none:"ไม่มี",
                 sort_newest: "ใหม่ - เก่า", sort_oldest: "เก่า - ใหม่",
                 sort_most_pages: "หน้าเยอะ", sort_least_pages: "หน้าน้อย", sort_az: "A - Z", sort_za: "Z - A",
+                sort_last_read_newest: "อ่านล่าสุด", sort_last_read_oldest: "อ่านนานแล้ว",
                 list_header: "รายการ", all_tags: '<i class="fa-solid fa-tags"></i> แท็กทั้งหมด', all_artists: '<i class="fa-solid fa-users"></i> ศิลปินทั้งหมด',
                 no_data_simple: "ยังไม่มีข้อมูล", read_from_cover: "อ่านเลย",
                 upload_header_new: "อัปโหลดเรื่องใหม่", upload_header_edit: "แก้ไขข้อมูล",
@@ -884,6 +887,7 @@
                 read_progress: 'Read {current}/{total}', pagesett_none:"None",
                 sort_newest: "Newest - Oldest", sort_oldest: "Oldest - Newest",
                 sort_most_pages: "Most Pages", sort_least_pages: "Least Pages", sort_az: "A - Z", sort_za: "Z - A",
+                sort_last_read_newest: "Last Read - Newest", sort_last_read_oldest: "Last Read - Oldest",
                 list_header: "List", all_tags: '<i class="fa-solid fa-tags"></i> All Tags', all_artists: '<i class="fa-solid fa-users"></i> All Artists', all_series: '<i class="fa-solid fa-book"></i> All Series',
                 no_data_simple: "No data available", read_from_cover: "Read now",
                 upload_header_new: "Upload New", upload_header_edit: "Edit Info",
@@ -927,6 +931,7 @@
                 read_progress: '阅读进度 {current}/{total}', pagesett_none:"无",
                 sort_newest: "最新 - 最旧", sort_oldest: "最旧 - 最新",
                 sort_most_pages: "页数最多", sort_least_pages: "页数最少", sort_az: "A - Z", sort_za: "Z - A",
+                sort_last_read_newest: "最近阅读", sort_last_read_oldest: "很久没读",
                 list_header: "列表", all_tags: '<i class="fa-solid fa-tags"></i> 所有标签', all_artists: '<i class="fa-solid fa-users"></i> 所有作者',
                 no_data_simple: "暂无内容", read_from_cover: "立即阅读",
                 upload_header_new: "上传新项目", upload_header_edit: "编辑信息",
@@ -970,6 +975,7 @@
                 read_progress: '{current}/{total} ページ', pagesett_none:"なし",
                 sort_newest: "新しい順", sort_oldest: "古い順",
                 sort_most_pages: "ページ多い順", sort_least_pages: "ページ少ない順", sort_az: "A - Z", sort_za: "Z - A",
+                sort_last_read_newest: "最後に読んだ", sort_last_read_oldest: "ずっと読んでない",
                 list_header: "リスト", all_tags: '<i class="fa-solid fa-tags"></i> すべてのタグ', all_artists: '<i class="fa-solid fa-users"></i> すべての作者',
                 no_data_simple: "データなし", read_from_cover: "今すぐ読む",
                 upload_header_new: "新規登録", upload_header_edit: "情報を編集",
@@ -1013,8 +1019,8 @@
 
         // ================= DATABASE (Dexie.js) v3 =================
         const db = new Dexie("UGalDB");
-        db.version(82).stores({
-            galleries: '++id, title, createdAt, isFavorite, lastReadPage, totalPages',
+        db.version(85).stores({
+            galleries: '++id, title, createdAt, isFavorite, lastReadPage, lastAccessedAt, totalPages',
             pages: '++id, galleryId, order',
             settings: 'key',
             translationSets: '++id, galleryId, name'
@@ -1029,6 +1035,7 @@
                     batch.forEach(g => {
                         if (!g.characters) g.characters = [];
                         if (!g.series) g.series = [];
+                        if (!g.lastAccessedAt) g.lastAccessedAt = null; // Initialize new field
                     });
                     db.galleries.bulkPut(batch);
                 }
@@ -1373,6 +1380,16 @@
                     if (sort === 'za') return b.title.localeCompare(a.title);
                     if (sort === 'most_pages') return (b.totalPages || 0) - (a.totalPages || 0);
                     if (sort === 'least_pages') return (a.totalPages || 0) - (b.totalPages || 0);
+                    if (sort === 'last_read_newest') {
+                        const aDate = a.lastAccessedAt ? new Date(a.lastAccessedAt) : new Date(a.createdAt);
+                        const bDate = b.lastAccessedAt ? new Date(b.lastAccessedAt) : new Date(b.createdAt);
+                        return bDate - aDate;
+                    }
+                    if (sort === 'last_read_oldest') {
+                        const aDate = a.lastAccessedAt ? new Date(a.lastAccessedAt) : new Date(a.createdAt);
+                        const bDate = b.lastAccessedAt ? new Date(b.lastAccessedAt) : new Date(b.createdAt);
+                        return aDate - bDate;
+                    }
                     return 0;
                 });
             },
@@ -3034,7 +3051,7 @@
             
             clearBookmark: async (id) => {
                 if(confirm(T('confirm_delete_bookmark'))) {
-                    await db.galleries.update(id, { lastReadPage: null });
+                    await db.galleries.update(id, { lastReadPage: null, lastAccessedAt: null });
                     Detail.load(id); // Reload UI
                 }
             }
@@ -3207,7 +3224,7 @@
             },
             clearBookmark: async () => {
                 if(confirm(T('confirm_delete_bookmark'))) {
-                    await db.galleries.update(Detail.currentGallery.id, { lastReadPage: null });
+                    await db.galleries.update(Detail.currentGallery.id, { lastReadPage: null, lastAccessedAt: null });
                     Detail.currentGallery.lastReadPage = null; // Update local state
                     Detail.updateReadButton(); // Update UI
                 }
@@ -3256,6 +3273,7 @@
                 // Update Progress to DB and save state
                 db.galleries.update(App.currentGalleryId, { 
                     lastReadPage: App.reader.currentIndex, 
+                    lastAccessedAt: new Date().toISOString(),
                     totalPages: App.pages.length 
                 });
                 StateManager.save();
@@ -3339,7 +3357,9 @@
                 Reader.renderPage(); // Call original logic to populate the single page
                 // Restore scroll position after a brief delay to ensure layout is complete
                 setTimeout(() => {
-                    window.scrollTo(0, App.reader.scrollY);
+                    if (typeof App.reader.scrollY === 'number' && App.reader.scrollY >= 0) {
+                        window.scrollTo(0, App.reader.scrollY);
+                    }
                 }, 50);
             },
 
@@ -3366,7 +3386,7 @@
                         const newIndex = parseInt(mostVisibleEntry.target.dataset.index);
                         if (App.reader.currentIndex !== newIndex) {
                             App.reader.currentIndex = newIndex;
-                            db.galleries.update(App.currentGalleryId, { lastReadPage: newIndex });
+                            db.galleries.update(App.currentGalleryId, { lastReadPage: newIndex, lastAccessedAt: new Date().toISOString() });
                             StateManager.save();
                             const state = { view: 'reader', params: { galleryId: App.currentGalleryId, index: newIndex } };
                             history.replaceState(state, '', UI.stateToUrl(state));
@@ -3412,12 +3432,14 @@
                 
                 // Scroll to the current page or restore saved scroll position
                 setTimeout(() => {
-                    if (App.reader.webtoonScrollY > 0) {
-                        // Restore previous scroll position
+                    const images = container.querySelectorAll('img');
+                    // Check if we have saved scroll position AND it's from the same session
+                    // If webtoonScrollY is defined and not NaN, restore it. Otherwise scroll to currentIndex
+                    if (typeof App.reader.webtoonScrollY === 'number' && App.reader.webtoonScrollY >= 0) {
+                        // ✅ Restore previous scroll position (including 0 if that was where user was)
                         window.scrollTo(0, App.reader.webtoonScrollY);
                     } else {
-                        // First load, scroll current page into view
-                        const images = container.querySelectorAll('img');
+                        // First load: scroll to current page (from lastReadPage)
                         if (images[App.reader.currentIndex]) {
                             images[App.reader.currentIndex].scrollIntoView({ behavior: 'auto', block: 'start' });
                         }
@@ -3635,12 +3657,32 @@
             },
 
             handleLayerClick: (e) => {
-                if (!App.reader.isEditMode) return;
                 // If clicked empty space on layer
                 if (e.target.id === 'translationLayer') {
                     const rect = e.target.getBoundingClientRect();
                     const xPercent = ((e.clientX - rect.left) / rect.width) * 100;
                     const yPercent = ((e.clientY - rect.top) / rect.height) * 100;
+                    
+                    // Feature: Click edge to navigate pages (only in single page mode, not in edit mode)
+                    if (!App.reader.isEditMode && App.reader.readMode === 'single') {
+                        const EDGE_THRESHOLD = 20; // 20% from each edge
+                        
+                        // Right edge (>) 80% → next page
+                        if (xPercent >= (100 - EDGE_THRESHOLD)) {
+                            Reader.nextPage();
+                            return;
+                        }
+                        
+                        // Left edge (< 20%) → previous page
+                        if (xPercent < EDGE_THRESHOLD) {
+                            Reader.prevPage();
+                            return;
+                        }
+                    }
+                    
+                    // Create translation box (edit mode only)
+                    if (!App.reader.isEditMode) return;
+                    
                     Reader.createTranslationBox({ x: xPercent, y: yPercent, w: 20, h: 10, text: '', fontSize: 14, bgMode: 'white', colorMode: 'black', shape: 'rect' }, true);
                     Reader.markUnsaved();
                 }
@@ -3896,6 +3938,9 @@
                 const oldText = btn.innerText;
                 btn.innerText = T('saved_msg'); btn.classList.add('bg-green-500', 'text-white');
                 setTimeout(() => { btn.innerText = oldText; btn.classList.remove('bg-green-500', 'text-white'); }, 1500);
+                
+                // Exit edit mode after saving
+                setTimeout(() => { Reader.toggleEditMode(); }, 1500);
             }
         };
 
@@ -4200,7 +4245,7 @@
                 if (App.reader.readMode === 'single') {
                     App.reader.scrollY = window.scrollY;
                 } else if (App.reader.readMode === 'webtoon') {
-                    App.reader.webtoonScrollY = window.scrollY;
+                    App.reader.webtoonScrollY = window.scrollY; // Save scroll position in webtoon mode
                 }
             } else {
                 // Other views: track scroll position by view key
@@ -4210,7 +4255,7 @@
             // Throttle: save only once every 500ms while scrolling
             if (scrollTimeout) clearTimeout(scrollTimeout);
             scrollTimeout = setTimeout(() => {
-                StateManager.save();
+                StateManager.save(); // Save webtoonScrollY to localStorage
                 scrollTimeout = null;
             }, 500);
         });
@@ -4243,6 +4288,15 @@
             if(Reader.dragTarget) {
                 Reader.markUnsaved(); // Mark unsaved after drag ends
                 Reader.dragTarget = null;
+            }
+        });
+
+        // Close settings dropdown when clicking outside it
+        document.addEventListener('click', (e) => {
+            const settingsBtn = document.querySelector('#readerTopBar button[onclick*="readerSettings"]');
+            const settingsDropdown = document.getElementById('readerSettings');
+            if (settingsBtn && settingsDropdown && !settingsBtn.contains(e.target) && !settingsDropdown.contains(e.target)) {
+                settingsDropdown.classList.add('hide');
             }
         });
 
