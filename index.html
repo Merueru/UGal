@@ -406,6 +406,21 @@
         #mobileSearchInput::placeholder {
             color: #6b7280;
         }
+
+        /* Storage Details Accordion */
+        #storageDetailsSection {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        #storageToggleIcon {
+            transition: transform 0.3s ease;
+        }
+
+        #storageDetailsSection:not(.hidden) {
+            max-height: 500px;
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -420,7 +435,7 @@
                 <a href="#" onclick="UI.navigate('home')" class="text-xl font-bold flex items-center gap-2 navbar-logo-group">
                     <span class="text-nRed hover:scale-110 transition" data-i18n-title="home_title"><i class="fa-solid fa-book-open"></i></span>
                     <span class="hidden sm:inline text-xl text-nRed hover:scale-110 transition" >UGal</span>
-                    <p class="hidden sm:block text-gray-400 text-sm" style="font-size: 12px;">V 0.3.6</p>
+                    <p class="hidden sm:block text-gray-400 text-sm" style="font-size: 12px;">V 0.3.7</p>
                 </a>
                 <div class="hidden md:flex gap-4 text-sm font-semibold text-gray-300">
                     <a href="#" onclick="UI.navigate('home')" class="hover:text-nRed transition" data-i18n-title="home_title" data-i18n="home_page">หน้าหลัก</a>
@@ -878,8 +893,51 @@
                 <button onclick="FileSystemManager.backupAllGalleries()" class="bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white px-4 py-3 rounded-lg w-full font-bold transition shadow-lg mb-6 flex items-center justify-center gap-2">
                     <i class="fa-solid fa-cloud-arrow-down"></i> <span data-i18n="backup_all">Backup All</span>
                 </button>
+                <!-- Storage Usage Gauge (Collapsible) -->
+                <div class="mb-6 bg-darkBg rounded-lg border border-gray-700/50 overflow-hidden">
+                    <!-- Header Button -->
+                    <button onclick="StorageManager.toggleStorageDetails()" class="w-full flex items-center justify-between p-4 hover:bg-gray-700/30 transition">
+                        <div class="flex items-center gap-3">
+                            <i id="storageToggleIcon" class="fa-solid fa-chevron-right text-gray-400 transition-transform"></i>
+                            <label class="text-sm text-gray-300 font-semibold cursor-pointer" data-i18n="storage_usage">Storage Usage</label>
+                        </div>
+                        <i onclick="event.stopPropagation(); StorageManager.refreshStorageUsage()" class="fa-solid fa-rotate text-gray-400 hover:text-white transition cursor-pointer" title="Refresh Storage Info"></i>
+                    </button>
+                    
+                    <!-- Collapsible Details Section -->
+                    <div id="storageDetailsSection" class="hidden max-h-0 overflow-hidden transition-all duration-300">
+                        <div class="p-4 border-t border-gray-700/50">
+                            <!-- Technical Info Title -->
+                            <p class="text-xs text-gray-400 font-semibold mb-4" data-i18n="storage_info">IndexedDB Storage</p>
+                            
+                            <!-- Gauge Bar -->
+                            <div id="storageGaugeContainer" class="mb-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-xs text-gray-400" data-i18n="storage_usage">Storage Usage</span>
+                                    <span id="storagePercentageText" class="text-xs font-semibold text-gray-300">0.00%</span>
+                                </div>
+                                <div class="relative h-6 bg-gray-800 rounded-lg overflow-hidden border border-gray-600">
+                                    <div id="storageGauge" class="h-full w-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 transition-all duration-300 flex items-center justify-end pr-2">
+                                        <span id="storageGaugeText" class="text-xs font-bold text-white drop-shadow-lg" style="text-shadow: 0 0 2px black;"></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Storage Details -->
+                            <div class="grid grid-cols-2 gap-2 text-center">
+                                <div>
+                                    <p class="text-xs text-gray-400" data-i18n="storage_used">Used</p>
+                                    <p id="storageUsedText" class="text-sm font-semibold text-gray-200">0 B</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-400" data-i18n="storage_total">Total</p>
+                                    <p id="storageTotalText" class="text-sm font-semibold text-gray-200">50 MB</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <div class="flex justify-end gap-2 border-t border-gray-700 pt-4">
-                    <button onclick="document.getElementById('settingsModal').classList.add('hide')" class="text-gray-300 hover:text-white px-4 py-2 font-medium transition" data-i18n="close_btn_settings_modal">Close</button>
+                    <button onclick="document.getElementById('settingsModal').classList.add('hide')" class="bg-gradient-to-r from-nRed to-red-600 hover:from-red-600 hover:to-red-700 text-white px-4 py-2 rounded-lg font-medium transition shadow-md" data-i18n="close_btn_settings_modal">Close</button>
                 </div>
             </div>
         </div>
@@ -1104,7 +1162,8 @@
                 settingmodal: "ตั้งค่า", local_backup_folder: "โฟลเดอร์สำรองข้อมูล", select_folder: "เลือกโฟลเดอร์...", backup_info: "ข้อมูลจะถูกบันทึกเป็นไฟล์ .json ในโฟลเดอร์นี้โดยอัตโนมัติ", restore_local: "กู้คืนจากโฟลเดอร์ในเครื่อง", backup_all: "สำรองข้อมูลทั้งหมด", close_btn_settings_modal: "ปิด", disconnect_folder: "ยกเลิกการสำรองข้อมูล",
                 new_trans_set_title: "สร้างชุดแปลใหม่", new_trans_set_placeholder: "เช่น แปลเล่น01 โดย ผู้ใช้A", create_btn: "สร้าง", export_trans_sets_title: "ส่งออกชุดแปล", export_btn: "ส่งออก", import_trans_sets_title: "นำเข้าชุดแปล", import_trans_sets_desc: "เลือกไฟล์ .json ของชุดแปล", import_btn: "นำเข้า", trans_sets_section: "ชุดแปล:",
                 addnewtranscollect: "+ ชุดใหม่",grid_edit_delete_title: "แก้ไข / ลบ",shape_rect: "สี่เหลี่ยม", delete_trans_sets_title: "ลบชุดคำแปล", delete_trans_sets: "ลบชุดคำแปล", delete_confirm_msg: "คุณแน่ใจหรือไม่ว่าต้องการลบชุดแปลที่เลือก?", delete_btn_text: "ลบ", create_continuation_title: "สร้างตอนต่อ",
-                sort_most_viewed: "อ่านบ่อยสุด", sort_least_viewed: "อ่านน้อยสุด"
+                sort_most_viewed: "อ่านบ่อยสุด", sort_least_viewed: "อ่านน้อยสุด",
+                storage_usage: "พื้นที่เก็บข้อมูล", storage_used: "ใช้ไป", storage_total: "เต็ม", storage_percent: "ใช้ไป", refresh_storage_btn: "อัปเดต", storage_info: "ข้อมูล IndexedDB"
             },
             en: {
                 decrease_size_title: "Decrease text size", increase_size_title: "Increase text size", shape_rect_title: "Rectangle", bg_white_title: "White background", bg_black_title: "Black background", bg_clear_title: "Transparent background", color_black_title: "Black text", color_white_title: "White text",
@@ -1149,7 +1208,8 @@
                 settingmodal: "Settings", local_backup_folder: "Local Backup Folder", select_folder: "Select Folder...", backup_info: "Data will be saved as .json files in this folder automatically.", restore_local: "Restore from Local Folder", backup_all: "Backup All", close_btn_settings_modal: "Close", disconnect_folder: "Disconnect Folder",
                 new_trans_set_title: "Create Translation Set", new_trans_set_placeholder: "e.g. Translation Set 01 by User A", create_btn: "Create", export_trans_sets_title: "Export Translation Sets", export_btn: "Export", import_trans_sets_title: "Import Translation Sets", import_trans_sets_desc: "Select a .json file with translation sets", import_btn: "Import", trans_sets_section: "Translation Sets:",
                 addnewtranscollect: "+ New Set",grid_edit_delete_title: "Edit / Delete",shape_rect: "Rectangle", delete_trans_sets_title: "Delete Translation Sets", delete_trans_sets: "Delete Sets", delete_confirm_msg: "Are you sure you want to delete selected translation sets?", delete_btn_text: "Delete", create_continuation_title: "Create Continuation",
-                sort_most_viewed: "Most Viewed", sort_least_viewed: "Least Viewed"
+                sort_most_viewed: "Most Viewed", sort_least_viewed: "Least Viewed",
+                storage_usage: "Storage Usage", storage_used: "Used", storage_total: "Total", storage_percent: "Used", refresh_storage_btn: "Refresh", storage_info: "IndexedDB Storage"
             },
             cn: {
                 decrease_size_title: "减小文字大小", increase_size_title: "增大文字大小", shape_rect_title: "矩形", bg_white_title: "白色背景", bg_black_title: "黑色背景", bg_clear_title: "透明背景", color_black_title: "黑色文字", color_white_title: "白色文字",
@@ -1194,7 +1254,8 @@
                 settingmodal: "设置", local_backup_folder: "本地备份文件夹", select_folder: "选择文件夹...", backup_info: "数据将自动保存为此文件夹中的 .json 文件", restore_local: "从本地文件夹恢复", backup_all: "备份所有", close_btn_settings_modal: "关闭", disconnect_folder: "断开文件夹",
                 new_trans_set_title: "创建翻译集", new_trans_set_placeholder: "例如 翻译组01 作者 用户A", create_btn: "创建", export_trans_sets_title: "导出翻译集", export_btn: "导出", import_trans_sets_title: "导入翻译集", import_trans_sets_desc: "选择包含翻译集的.json文件", import_btn: "导入", trans_sets_section: "翻译集:",
                 addnewtranscollect: "+ 新建翻译集",grid_edit_delete_title: "编辑 / 删除",shape_rect: "矩形", delete_trans_sets_title: "删除翻译集", delete_trans_sets: "删除翻译集", delete_confirm_msg: "确定要删除选择的翻译集吗？", delete_btn_text: "删除", create_continuation_title: "创建续篇",
-                sort_most_viewed: "最常查看", sort_least_viewed: "最少查看"
+                sort_most_viewed: "最常查看", sort_least_viewed: "最少查看",
+                storage_usage: "数据存储", storage_used: "已用", storage_total: "总容量", storage_percent: "已用", refresh_storage_btn: "刷新", storage_info: "IndexedDB 存储"
             },
             jp: {
                 decrease_size_title: "テキストサイズを縮小", increase_size_title: "テキストサイズを拡大", shape_rect_title: "矩形", bg_white_title: "白い背景", bg_black_title: "黒い背景", bg_clear_title: "透明な背景", color_black_title: "黒いテキスト", color_white_title: "白いテキスト",
@@ -1239,7 +1300,8 @@
                 settingmodal: "設定", local_backup_folder: "ローカルバックアップフォルダ", select_folder: "フォルダを選択...", backup_info: "データはこのフォルダに .json ファイルとして自動的に保存されます", restore_local: "ローカルフォルダから復元", backup_all: "すべてをバックアップ", close_btn_settings_modal: "閉じる", disconnect_folder: "フォルダを切断",
                 new_trans_set_title: "翻訳セットを作成", new_trans_set_placeholder: "例 翻訳セット01 ユーザーA", create_btn: "作成", export_trans_sets_title: "翻訳セットを書き出し", export_btn: "書き出し", import_trans_sets_title: "翻訳セットを読み込み", import_trans_sets_desc: "翻訳セットを含む.jsonファイルを選択", import_btn: "読み込む", trans_sets_section: "翻訳セット:",
                 addnewtranscollect: "+ 新しいセット",grid_edit_delete_title: "編集 / 削除",shape_rect: "四角形", delete_trans_sets_title: "翻訳セットを削除", delete_trans_sets: "翻訳セットを削除",delete_confirm_msg: "本当に削除しますか？", delete_btn_text: "削除", create_continuation_title: "続編を作成",
-                sort_most_viewed: "最も多く読まれた", sort_least_viewed: "最も読まれていない"
+                sort_most_viewed: "最も多く読まれた", sort_least_viewed: "最も読まれていない",
+                storage_usage: "ストレージ使用量", storage_used: "使用", storage_total: "容量", storage_percent: "使用", refresh_storage_btn: "更新", storage_info: "IndexedDB ストレージ"
             }
         };
 
@@ -1253,7 +1315,7 @@
 
         // ================= DATABASE (Dexie.js) v3 =================
         const db = new Dexie("UGalDB");
-        db.version(86).stores({
+        db.version(87).stores({
             galleries: '++id, title, createdAt, isFavorite, lastReadPage, lastAccessedAt, totalPages, viewCount',
             pages: '++id, galleryId, order',
             settings: 'key',
@@ -4884,6 +4946,122 @@
             }
         };
 
+        // ================= STORAGE MANAGER =================
+        const StorageManager = {
+            isStorageExpanded: false,
+
+            async getStorageUsage() {
+                if (!navigator.storage || !navigator.storage.estimate) {
+                    console.warn('Storage API not available');
+                    return { used: 0, quota: 50 * 1024 * 1024 }; // Fallback: 50MB
+                }
+                try {
+                    const estimate = await navigator.storage.estimate();
+                    return {
+                        used: estimate.usage || 0,
+                        quota: estimate.quota || 50 * 1024 * 1024
+                    };
+                } catch (e) {
+                    console.error('Error getting storage:', e);
+                    return { used: 0, quota: 50 * 1024 * 1024 };
+                }
+            },
+
+            formatBytes(bytes) {
+                const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+                if (bytes === 0) return '0 B';
+                const i = Math.floor(Math.log(bytes) / Math.log(1024));
+                return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + sizes[i];
+            },
+
+            getGaugeColor(percentage) {
+                if (percentage < 50) return 'from-green-500 to-green-500';
+                if (percentage < 75) return 'from-yellow-400 to-orange-500';
+                return 'from-orange-500 to-red-600';
+            },
+
+            toggleStorageDetails() {
+                const section = document.getElementById('storageDetailsSection');
+                const icon = document.getElementById('storageToggleIcon');
+                
+                StorageManager.isStorageExpanded = !StorageManager.isStorageExpanded;
+                
+                if (StorageManager.isStorageExpanded) {
+                    section.classList.remove('hidden');
+                    // Trigger animation
+                    setTimeout(() => {
+                        section.style.maxHeight = section.scrollHeight + 'px';
+                    }, 10);
+                    icon.style.transform = 'rotate(90deg)';
+                } else {
+                    section.style.maxHeight = '0px';
+                    icon.style.transform = 'rotate(0deg)';
+                    setTimeout(() => {
+                        section.classList.add('hidden');
+                    }, 300);
+                }
+            },
+
+            async updateStorageDisplay() {
+                const storage = await StorageManager.getStorageUsage();
+                const percentage = (storage.used / storage.quota) * 100;
+
+                // Update gauge bar
+                const gauge = document.getElementById('storageGauge');
+                const gaugeText = document.getElementById('storageGaugeText');
+                const percentageText = document.getElementById('storagePercentageText');
+                const usedText = document.getElementById('storageUsedText');
+                const totalText = document.getElementById('storageTotalText');
+
+                if (!gauge) return; // Modal not open
+
+                // Update percentage and format
+                percentageText.textContent = percentage.toFixed(2) + '%';
+                gauge.style.width = Math.min(percentage, 100) + '%';
+                
+                // Update gauge color based on usage
+                gauge.className = `h-full w-0 bg-gradient-to-r ${StorageManager.getGaugeColor(percentage)} transition-all duration-300 flex items-center justify-end pr-2`;
+                
+                // Update gauge text (show percentage if width > 5%)
+                if (percentage > 5) {
+                    gaugeText.textContent = percentage.toFixed(2) + '%';
+                } else {
+                    gaugeText.textContent = '';
+                }
+
+                // Update detail text using formatBytes (auto-select unit)
+                usedText.textContent = StorageManager.formatBytes(storage.used);
+                totalText.textContent = StorageManager.formatBytes(storage.quota);
+            },
+
+            refreshStorageUsage() {
+                StorageManager.updateStorageDisplay();
+                Toast.info(T('refresh_storage_btn'));
+            },
+
+            init() {
+                // Update on modal open
+                const settingsBtn = document.querySelector('[onclick*="settingsModal"]');
+                if (settingsBtn) {
+                    // Update when settings modal opens
+                    const originalClick = settingsBtn.onclick;
+                    document.addEventListener('click', (e) => {
+                        const modal = document.getElementById('settingsModal');
+                        if (e.target === settingsBtn || e.target.closest('[onclick*="settingsModal"]')) {
+                            setTimeout(() => {
+                                if (!modal.classList.contains('hide')) {
+                                    StorageManager.updateStorageDisplay();
+                                }
+                            }, 100);
+                        }
+                    });
+                }
+                
+                // Update storage display when page loads
+                setTimeout(() => StorageManager.updateStorageDisplay(), 1000);
+            }
+        };
+
         // ================= GLOBAL EVENTS =================
         // Save scroll position when user scrolls (throttled)
         let scrollTimeout = null;
@@ -4995,6 +5173,7 @@
             SeriesSuggestions.init();
             StateManager.load();
             FileSystemManager.init();
+            StorageManager.init();
         };
 
     </script>
