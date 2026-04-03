@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     
     <script>
         tailwind.config = {
@@ -435,7 +436,7 @@
                 <a href="#" onclick="UI.navigate('home')" class="text-xl font-bold flex items-center gap-2 navbar-logo-group">
                     <span class="text-nRed hover:scale-110 transition" data-i18n-title="home_title"><i class="fa-solid fa-book-open"></i></span>
                     <span class="hidden sm:inline text-xl text-nRed hover:scale-110 transition" >UGal</span>
-                    <p class="hidden sm:block text-gray-400 text-sm" style="font-size: 12px;">V 0.3.8</p>
+                    <p class="hidden sm:block text-gray-400 text-sm" style="font-size: 12px;">V 0.3.9</p>
                 </a>
                 <div class="hidden md:flex gap-4 text-sm font-semibold text-gray-300">
                     <a href="#" onclick="UI.navigate('home')" class="hover:text-nRed transition" data-i18n-title="home_title" data-i18n="home_page">หน้าหลัก</a>
@@ -475,7 +476,7 @@
                     <button onclick="document.getElementById('importInput').click()" class="bg-gray-700 hover:bg-blue-500 px-3 py-1.5 rounded-full text-white transition" data-i18n-title="import_title" title="นำเข้าข้อมูล (Restore)">
                         <i class="fa-solid fa-file-import"></i>
                     </button>
-                    <input type="file" id="importInput" class="hidden" accept=".json" onchange="DataManager.importData(event)">
+                    <input type="file" id="importInput" class="hidden" accept=".zip,.json" onchange="DataManager.importData(event)">
                 </div>
 
                 <button onclick="UI.navigate('upload')" class="bg-nRed hover:bg-nRedHover text-white px-3 sm:px-4 py-1.5 rounded text-xs sm:text-sm font-semibold transition flex items-center gap-2">
@@ -740,10 +741,10 @@
                     <div class="flex flex-wrap gap-3 mt-4 pt-4 border-t border-gray-700">
                         <span class="text-gray-400 text-xs font-semibold self-center px-1" data-i18n="trans_sets_section">Translation Sets:</span>
                         <button onclick="TranslationManager.showExportDialog()" class="bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 px-4 py-2 rounded-lg font-semibold text-white text-sm transition shadow-md flex items-center gap-2" data-i18n-title="export_trans_sets_title" title="Export Sets">
-                            <i class="fa-solid fa-download"></i> <span data-i18n="export_btn">Export</span>
+                            <i class="fa-solid fa-upload"></i> <span data-i18n="export_btn">Export</span>
                         </button>
                         <button onclick="TranslationManager.showImportDialog()" class="bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 px-4 py-2 rounded-lg font-semibold text-white text-sm transition shadow-md flex items-center gap-2" data-i18n-title="import_trans_sets_title" title="Import Sets">
-                            <i class="fa-solid fa-upload"></i> <span data-i18n="import_btn">Import</span>
+                            <i class="fa-solid fa-download"></i> <span data-i18n="import_btn">Import</span>
                         </button>
                         <button onclick="TranslationManager.showDeleteDialog()" class="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 px-4 py-2 rounded-lg font-semibold text-white text-sm transition shadow-md flex items-center gap-2" data-i18n-title="delete_trans_sets_title" title="Delete Translation Sets">
                             <i class="fa-solid fa-trash"></i> <span data-i18n="delete_trans_sets">Delete Sets</span>
@@ -3559,7 +3560,8 @@
                     id: p.id,
                     file: p.imageBlob,
                     url: URL.createObjectURL(p.imageBlob),
-                    translations: p.translations || []
+                    translations: p.translations || [],
+                    translationSets: p.translationSets || []
                 }));
                 UploadManager.renderPagesGrid();
                 
@@ -3618,7 +3620,9 @@
                         UploadManager.pageFiles.push({
                             id: Date.now() + Math.random(),
                             file: file,
-                            url: URL.createObjectURL(file)
+                            url: URL.createObjectURL(file),
+                            translations: [],
+                            translationSets: []
                         });
                         hasImages = true;
                     } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
@@ -3648,7 +3652,9 @@
                                     UploadManager.pageFiles.push({
                                         id: Date.now() + Math.random() + completed,
                                         file: new File([imageData.blob], imageData.fileName, { type: 'image/webp' }),
-                                        url: URL.createObjectURL(imageData.blob)
+                                        url: URL.createObjectURL(imageData.blob),
+                                        translations: [],
+                                        translationSets: []
                                     });
                                     
                                     // อัปเดต progress bar
@@ -3783,7 +3789,13 @@
                         
                         // Replace pages (delete old, insert current state)
                         await db.pages.where('galleryId').equals(galleryId).delete();
-                        const pagesToSave = UploadManager.pageFiles.map((p, index) => ({ galleryId, order: index, imageBlob: p.file, translations: p.translations || [] }));
+                        const pagesToSave = UploadManager.pageFiles.map((p, index) => ({ 
+                            galleryId, 
+                            order: index, 
+                            imageBlob: p.file, 
+                            translations: p.translations || [], 
+                            translationSets: p.translationSets || [] 
+                        }));
                         if(pagesToSave.length > 0) await db.pages.bulkAdd(pagesToSave);
                         
                         Toast.success(T('alert_edit_success'));
@@ -3791,7 +3803,7 @@
                     } else {
                         // Create new
                         galleryId = await db.galleries.add({ title, tags, artists, characters, series, coverBlob, createdAt: new Date().toISOString(), isFavorite: false, totalPages: UploadManager.pageFiles.length });
-                        const pagesToSave = UploadManager.pageFiles.map((p, index) => ({ galleryId, order: index, imageBlob: p.file, translations: [] }));
+                        const pagesToSave = UploadManager.pageFiles.map((p, index) => ({ galleryId, order: index, imageBlob: p.file, translations: [], translationSets: [] }));
                         if(pagesToSave.length > 0) await db.pages.bulkAdd(pagesToSave);
                         Toast.success(T('alert_save_success'));
                         await FileSystemManager.syncToLocal(galleryId);
@@ -3902,18 +3914,51 @@
                 try {
                     const g = await db.galleries.get(galleryId);
                     const pages = await db.pages.where('galleryId').equals(galleryId).sortBy('order');
-                    const coverBase64 = g.coverBlob ? await DataManager.blobToBase64(g.coverBlob) : null;
-                    const pagesWithBase64 = await Promise.all(pages.map(async p => ({ ...p, imageBlob: await DataManager.blobToBase64(p.imageBlob) })));
-
-                    const data = { type: 'single_gallery', gallery: { ...g, coverBlob: coverBase64 }, pages: pagesWithBase64 };
+                    const translationSets = await db.translationSets.where('galleryId').equals(galleryId).toArray();
                     
-                    // Use ID.json to avoid filename character issues
-                    const fileName = `${galleryId}.json`;
+                    // สร้าง ZIP file
+                    const zip = new JSZip();
+                    
+                    // เพิ่ม cover
+                    if (g.coverBlob) {
+                        const coverBase64 = await DataManager.blobToBase64(g.coverBlob);
+                        const coverDataUrl = coverBase64.split(',')[1];
+                        zip.file('cover.base64', coverDataUrl);
+                    }
+                    
+                    // เพิ่ม pages
+                    for (const p of pages) {
+                        const pageBase64 = await DataManager.blobToBase64(p.imageBlob);
+                        const pageDataUrl = pageBase64.split(',')[1];
+                        zip.file(`pages/${p.order}.base64`, pageDataUrl);
+                    }
+                    
+                    // สร้าง metadata (รวม translations + translationSets ของแต่ละ page)
+                    const metadata = {
+                        type: 'single_gallery',
+                        gallery: {
+                            ...g,
+                            coverBlob: g.coverBlob ? 'cover.base64' : null
+                        },
+                        pages: pages.map(p => ({
+                            ...p,
+                            imageBlob: `pages/${p.order}.base64`,
+                            translations: p.translations || [],
+                            translationSets: p.translationSets || []
+                        })),
+                        translationSets: translationSets
+                    };
+                    zip.file('metadata.json', JSON.stringify(metadata, null, 2));
+                    
+                    // บันทึกหรือส่ง ZIP ไปยัง folder ที่เลือก
+                    const zipBlob = await zip.generateAsync({type: 'blob'});
+                    const fileName = `UGal-gallery-${galleryId}.zip`;
                     const fileHandle = await FileSystemManager.dirHandle.getFileHandle(fileName, { create: true });
                     const writable = await fileHandle.createWritable();
-                    await writable.write(JSON.stringify(data, null, 2));
+                    await writable.write(zipBlob);
                     await writable.close();
-                } catch (e) { console.error("Sync failed", e); }
+                    Toast.success(`บันทึกไฟล์ ZIP เข้าโฟลเดอร์แล้ว: ${fileName}`);
+                } catch (e) { console.error("Sync failed", e); Toast.error('Sync ล้มเหลว: ' + e.message); }
             },
 
             restoreFromLocal: async () => {
@@ -3924,55 +3969,61 @@
                 const count = await db.galleries.count();
                 if (count > 0 && !confirm("Database is not empty. Continue restoring? (Duplicates may occur)")) return;
 
-                // Count JSON files first
-                let jsonFiles = [];
+                // Count backup files (.zip and .json)
+                let backupFiles = [];
                 try {
                     for await (const entry of FileSystemManager.dirHandle.values()) {
-                        if (entry.kind === 'file' && entry.name.endsWith('.json')) {
-                            jsonFiles.push(entry);
+                        if (entry.kind === 'file' && (entry.name.endsWith('.zip') || entry.name.endsWith('.json'))) {
+                            backupFiles.push(entry);
                         }
                     }
                 } catch (e) { console.error("Error counting files", e); }
 
-                if (jsonFiles.length === 0) {
-                    Toast.info("No backup files found in the folder.");
+                if (backupFiles.length === 0) {
+                    Toast.info("No backup files (.zip or .json) found in the folder.");
                     return;
                 }
 
-                const progressBar = Toast.progress(`Restoring ${jsonFiles.length} files...`);
+                const progressBar = Toast.progress(`Restoring ${backupFiles.length} files...`);
                 let importedCount = 0;
                 
                 try {
-                    for (let i = 0; i < jsonFiles.length; i++) {
-                        const entry = jsonFiles[i];
+                    for (let i = 0; i < backupFiles.length; i++) {
+                        const entry = backupFiles[i];
                         try {
                             const file = await entry.getFile();
-                            const text = await file.text();
-                            const json = JSON.parse(text);
                             
-                            if (json.type === 'single_gallery') {
-                                // Check if this ID already exists to prevent duplicate key error if reusing IDs
-                                const exists = await db.galleries.get(json.gallery.id);
-                                if (!exists) {
-                                    if(json.gallery.coverBlob) json.gallery.coverBlob = await DataManager.base64ToBlob(json.gallery.coverBlob);
-                                    
-                                    // Restore with original ID
-                                    await db.galleries.put(json.gallery);
-                                    
-                                    const pages = await Promise.all(json.pages.map(async p => ({ 
-                                        ...p, 
-                                        imageBlob: await DataManager.base64ToBlob(p.imageBlob) 
-                                    })));
-                                    await db.pages.bulkPut(pages);
-                                    importedCount++;
+                            if (entry.name.endsWith('.zip')) {
+                                // Restore ZIP file
+                                await DataManager.importDataZip(file);
+                                importedCount++;
+                            } else if (entry.name.endsWith('.json')) {
+                                // Restore JSON file (legacy format)
+                                const text = await file.text();
+                                const json = JSON.parse(text);
+                                
+                                if (json.type === 'single_gallery') {
+                                    const exists = await db.galleries.get(json.gallery.id);
+                                    if (!exists) {
+                                        if(json.gallery.coverBlob) json.gallery.coverBlob = await DataManager.base64ToBlob(json.gallery.coverBlob);
+                                        
+                                        await db.galleries.put(json.gallery);
+                                        
+                                        const pages = await Promise.all(json.pages.map(async p => ({ 
+                                            ...p, 
+                                            imageBlob: await DataManager.base64ToBlob(p.imageBlob) 
+                                        })));
+                                        await db.pages.bulkPut(pages);
+                                        importedCount++;
+                                    }
                                 }
                             }
                         } catch (e) { console.error("Error reading file", entry.name, e); }
                         
                         // Update progress
-                        progressBar.update(((i + 1) / jsonFiles.length) * 100);
+                        progressBar.update(((i + 1) / backupFiles.length) * 100);
                     }
-                    progressBar.complete(`Restored ${importedCount} of ${jsonFiles.length} items.`);
+                    progressBar.complete(`Restored ${importedCount} of ${backupFiles.length} items.`);
                     setTimeout(() => UI.navigate('home'), 1000);
                 } catch (e) { 
                     progressBar.error();
@@ -3981,36 +4032,15 @@
             },
 
             backupAllGalleries: async () => {
-                if (!FileSystemManager.dirHandle) return Toast.error("Please select a folder first.");
-                if (!(await FileSystemManager.verifyPermission(true))) return;
-
                 const galleries = await db.galleries.toArray();
                 if (galleries.length === 0) {
                     Toast.info("No galleries to backup.");
                     return;
                 }
 
-                const progressBar = Toast.progress(`Backing up ${galleries.length} galleries...`);
-                let backupCount = 0;
-
-                try {
-                    for (let i = 0; i < galleries.length; i++) {
-                        try {
-                            await FileSystemManager.syncToLocal(galleries[i].id);
-                            backupCount++;
-                        } catch (e) {
-                            console.error("Error backing up gallery", galleries[i].id, e);
-                        }
-                        
-                        // Update progress
-                        progressBar.update(((i + 1) / galleries.length) * 100);
-                    }
-                    progressBar.complete(`Backed up ${backupCount} of ${galleries.length} galleries.`);
-                    Toast.success("Backup completed successfully!");
-                } catch (e) {
-                    progressBar.error();
-                    Toast.error("Backup failed: " + e.message);
-                }
+                // ใช้ DataManager.exportAll() เพื่อสร้าง ZIP file แทน
+                Toast.info("กำลังสร้างไฟล์ backup...");
+                await DataManager.exportAll();
             }
         };
 
@@ -4033,35 +4063,65 @@
                 try {
                     const g = await db.galleries.get(id);
                     const pages = await db.pages.where('galleryId').equals(id).sortBy('order');
+                    const translationSets = await db.translationSets.where('galleryId').equals(id).toArray();
                     
                     // แสดง progress toast
                     const progress = Toast.progress(`กำลังส่งออก: ${g.title}`);
-                    
-                    // Convert Blobs to Base64 with progress tracking
-                    let processed = 0;
                     progress.update(5);
                     
-                    const coverBase64 = g.coverBlob ? await DataManager.blobToBase64(g.coverBlob) : null;
+                    // สร้าง ZIP file
+                    const zip = new JSZip();
+                    let processed = 5;
+                    
+                    // เพิ่ม cover image ลงใน ZIP
+                    if (g.coverBlob) {
+                        const coverBase64 = await DataManager.blobToBase64(g.coverBlob);
+                        const coverDataUrl = coverBase64.split(',')[1]; // Remove data:image/... prefix
+                        zip.file('cover.base64', coverDataUrl);
+                    }
                     processed += 10;
                     progress.update(Math.min(50, processed));
                     
-                    const pagesWithBase64 = await Promise.all(pages.map(async (p, idx) => {
-                        const pageData = {
-                            ...p,
-                            imageBlob: await DataManager.blobToBase64(p.imageBlob)
-                        };
-                        processed += (40 / pages.length);
-                        progress.update(Math.min(90, processed));
-                        return pageData;
-                    }));
-
-                    const data = {
+                    // เพิ่ม pages images ลงใน ZIP
+                    for (let i = 0; i < pages.length; i++) {
+                        const p = pages[i];
+                        const pageBase64 = await DataManager.blobToBase64(p.imageBlob);
+                        const pageDataUrl = pageBase64.split(',')[1]; // Remove data:image/... prefix
+                        zip.file(`pages/${p.order}.base64`, pageDataUrl);
+                        
+                        processed += (35 / pages.length);
+                        progress.update(Math.min(85, processed));
+                    }
+                    
+                    // สร้าง metadata JSON (ไม่มี image blobs, รวม translations + translationSets ของแต่ละ page)
+                    const metadata = {
                         type: 'single_gallery',
-                        gallery: { ...g, coverBlob: coverBase64 },
-                        pages: pagesWithBase64
+                        gallery: {
+                            ...g,
+                            coverBlob: g.coverBlob ? 'cover.base64' : null
+                        },
+                        pages: pages.map(p => ({
+                            ...p,
+                            imageBlob: `pages/${p.order}.base64`,
+                            translations: p.translations || [],
+                            translationSets: p.translationSets || []
+                        })),
+                        translationSets: translationSets
                     };
-
-                    DataManager.downloadJSON(data, `UGal-gallery-${g.title.substring(0, 20)}.json`);
+                    zip.file('metadata.json', JSON.stringify(metadata, null, 2));
+                    
+                    processed = 90;
+                    progress.update(90);
+                    
+                    // สร้าง blob และดาวน์โหลด ZIP
+                    const zipBlob = await zip.generateAsync({type: 'blob'});
+                    const url = URL.createObjectURL(zipBlob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `UGal-gallery-${g.id}_${g.title.substring(0, 30)}.zip`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    
                     progress.complete('ส่งออกสำเร็จ!');
                 } catch(e) { 
                     if (Toast.activeProgressToast) Toast.activeProgressToast.querySelector('.toast-icon').textContent = '✕';
@@ -4077,24 +4137,64 @@
                     // แสดง progress toast
                     const progress = Toast.progress(`กำลังส่งออก ${galleries.length} เรื่อง...`);
                     
-                    const allData = [];
+                    // สร้าง ZIP หลัก
+                    const mainZip = new JSZip();
+                    
                     for(let i = 0; i < galleries.length; i++) {
                         const g = galleries[i];
                         const pages = await db.pages.where('galleryId').equals(g.id).sortBy('order');
-                        const coverBase64 = g.coverBlob ? await DataManager.blobToBase64(g.coverBlob) : null;
-                        const pagesWithBase64 = await Promise.all(pages.map(async p => ({
-                            ...p,
-                            imageBlob: await DataManager.blobToBase64(p.imageBlob)
-                        })));
-                        allData.push({ gallery: { ...g, coverBlob: coverBase64 }, pages: pagesWithBase64 });
+                        const translationSets = await db.translationSets.where('galleryId').equals(g.id).toArray();
+                        
+                        // สร้าง folder สำหรับแกลเลอรี่
+                        const galleryFolder = mainZip.folder(`gallery_${g.id}_${g.title.substring(0, 15)}`);
+                        
+                        // เพิ่ม cover image
+                        if (g.coverBlob) {
+                            const coverBase64 = await DataManager.blobToBase64(g.coverBlob);
+                            const coverDataUrl = coverBase64.split(',')[1];
+                            galleryFolder.file('cover.base64', coverDataUrl);
+                        }
+                        
+                        // เพิ่ม pages
+                        const pagesFolder = galleryFolder.folder('pages');
+                        for (let j = 0; j < pages.length; j++) {
+                            const p = pages[j];
+                            const pageBase64 = await DataManager.blobToBase64(p.imageBlob);
+                            const pageDataUrl = pageBase64.split(',')[1];
+                            pagesFolder.file(`${p.order}.base64`, pageDataUrl);
+                        }
+                        
+                        // สร้าง metadata สำหรับแกลเลอรี่ (รวม translations + translationSets ของแต่ละ page)
+                        const metadata = {
+                            type: 'single_gallery',
+                            gallery: {
+                                ...g,
+                                coverBlob: g.coverBlob ? 'cover.base64' : null
+                            },
+                            pages: pages.map(p => ({
+                                ...p,
+                                imageBlob: `pages/${p.order}.base64`,
+                                translations: p.translations || [],
+                                translationSets: p.translationSets || []
+                            })),
+                            translationSets: translationSets
+                        };
+                        galleryFolder.file('metadata.json', JSON.stringify(metadata, null, 2));
                         
                         // อัปเดต progress
                         const percent = ((i + 1) / galleries.length) * 100;
                         progress.update(percent);
                     }
 
-                    const backup = { type: 'full_backup', data: allData, date: new Date().toISOString() };
-                    DataManager.downloadJSON(backup, `UGal-full-backup-${Date.now()}.json`);
+                    // สร้าง blob และดาวน์โหลด ZIP
+                    const zipBlob = await mainZip.generateAsync({type: 'blob'});
+                    const url = URL.createObjectURL(zipBlob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `UGal-full-backup-${Date.now()}.zip`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    
                     progress.complete('ส่งออกสำเร็จ!');
                 } catch(e) { 
                     if (Toast.activeProgressToast) Toast.activeProgressToast.querySelector('.toast-icon').textContent = '✕';
@@ -4114,7 +4214,159 @@
                 const file = event.target.files[0];
                 if(!file) return;
                 
-                // แสดง progress toast
+                // ตรวจสอบชนิดไฟล์
+                const isZip = file.name.endsWith('.zip') || file.type === 'application/zip' || file.type === 'application/x-zip-compressed';
+                
+                if (isZip) {
+                    DataManager.importDataZip(file);
+                } else {
+                    DataManager.importDataJSON(file);
+                }
+                
+                event.target.value = ''; // Reset input
+            },
+
+            importDataZip: async (file, silent = false) => {
+                const progress = silent ? { update: () => {}, complete: () => {}, error: () => {} } : Toast.progress(`กำลังอ่านไฟล์ ZIP...`);
+                
+                try {
+                    progress.update(10);
+                    const zip = new JSZip();
+                    const zipData = await zip.loadAsync(file);
+                    progress.update(20);
+                    
+                    const importGallery = async (folderPath, index, total) => {
+                        let folder = folderPath === '' ? zipData : zipData.folder(folderPath);
+                        if (!folder) return;
+                        
+                        // อ่าน metadata.json
+                        const metadataFile = folder.file('metadata.json');
+                        if (!metadataFile) return;
+                        
+                        const metadataText = await metadataFile.async('text');
+                        const metadata = JSON.parse(metadataText);
+                        
+                        const gData = metadata.gallery;
+                        const pData = metadata.pages;
+                        const tData = metadata.translationSets || [];
+                        const originalId = gData.id;
+                        
+                        // ตรวจสอบและลบข้อมูลหน้าและชุดคำแปลเดิมก่อนเพื่อป้องกันข้อมูลขยะ (Overwrite mode)
+                        if (originalId) {
+                            await db.pages.where('galleryId').equals(originalId).delete();
+                            await db.translationSets.where('galleryId').equals(originalId).delete();
+                        }
+                        
+                        // อ่าน cover image
+                        if (gData.coverBlob) {
+                            const coverFile = folder.file(typeof gData.coverBlob === 'string' ? gData.coverBlob : 'cover.base64');
+                            if (coverFile) {
+                                const coverBase64 = await coverFile.async('text');
+                                gData.coverBlob = await DataManager.base64ToBlob('data:image/jpeg;base64,' + coverBase64);
+                            } else {
+                                gData.coverBlob = null;
+                            }
+                        }
+                        
+                        const newId = await db.galleries.put(gData);
+
+                        // 1. สร้าง Map เพื่อเก็บคู่ ID เก่า -> ID ใหม่ สำหรับชุดคำแปล
+                        const idMap = {};
+                        if (tData && tData.length > 0) {
+                            for (const ts of tData) {
+                                const oldTsId = ts.id;
+                                const tsToSave = { ...ts };
+                                delete tsToSave.id; // ลบ ID เก่าออกเพื่อให้ DB Gen ใหม่
+                                tsToSave.galleryId = newId;
+                                
+                                const newTsId = await db.translationSets.add(tsToSave);
+                                idMap[oldTsId] = newTsId;
+                            }
+                        }
+                        
+                        // 2. อ่านและเพิ่ม pages พร้อมปรับปรุง ID อ้างอิง
+                        const pagesToSave = [];
+                        for (const p of pData) {
+                            let imageBlob = null;
+                            if (p.imageBlob) {
+                                const pagePath = typeof p.imageBlob === 'string' ? p.imageBlob : `pages/${p.order}.base64`;
+                                const pageFile = folder.file(pagePath);
+                                if (pageFile) {
+                                    try {
+                                        const pageBase64 = await pageFile.async('text');
+                                        imageBlob = await DataManager.base64ToBlob('data:image/jpeg;base64,' + pageBase64);
+                                    } catch (e) {
+                                        console.warn(`Failed to import page ${p.order}:`, e);
+                                    }
+                                }
+                            }
+                            
+                            // อัปเดต setId ภายในรายการ translationSets ของหน้านี้ให้เป็น ID ใหม่
+                            if (p.translationSets && Array.isArray(p.translationSets)) {
+                                p.translationSets.forEach(setRef => {
+                                    if (idMap[setRef.setId]) {
+                                        setRef.setId = idMap[setRef.setId];
+                                    }
+                                });
+                            }
+
+                            pagesToSave.push({
+                                galleryId: newId,
+                                order: p.order,
+                                imageBlob: imageBlob,
+                                translations: p.translations || [],
+                                translationSets: p.translationSets || []
+                            });
+                        }
+                        
+                        if (pagesToSave.length > 0) await db.pages.bulkAdd(pagesToSave);
+                        
+                        const percent = 20 + ((index + 1) / total) * 80;
+                        progress.update(percent);
+                    };
+                    
+                    // หา gallery folders ทั้งหมด
+                    const galleryFolders = [];
+                    const folderMap = {};
+                    zipData.forEach((relativePath, file) => {
+                        const parts = relativePath.split('/').filter(p => p);
+                        if (parts.length > 0) {
+                            const folderName = parts[0];
+                            if (folderName.startsWith('gallery_')) {
+                                if (!folderMap[folderName]) {
+                                    folderMap[folderName] = true;
+                                    galleryFolders.push(folderName);
+                                }
+                            }
+                        }
+                    });
+                    
+                    if (galleryFolders.length === 0) {
+                        // ไม่เป็น multi-gallery ZIP, ลองหา single gallery ที่ root
+                        if (zipData.file('metadata.json')) {
+                            await importGallery('', 0, 1);
+                            if (!silent) progress.complete('นำเข้าสำเร็จ!');
+                            if (!silent) Toast.success(T('alert_import_success', {count: 1}));
+                        } else {
+                            throw new Error('ไม่พบไฟล์ metadata.json ในไฟล์ ZIP');
+                        }
+                    } else {
+                        // Multi-gallery ZIP
+                        for (let i = 0; i < galleryFolders.length; i++) {
+                            await importGallery(galleryFolders[i], i, galleryFolders.length);
+                        }
+                        if (!silent) progress.complete('นำเข้าสำเร็จ!');
+                        if (!silent) Toast.success(T('alert_import_success', {count: galleryFolders.length}));
+                    }
+                    
+                    if (!silent) UI.navigate('home');
+                } catch(err) {
+                    progress.error();
+                    Toast.error('เกิดข้อผิดพลาดในการนำเข้า ZIP: ' + err.message);
+                }
+            },
+
+            importDataJSON: async (file) => {
                 const progress = Toast.progress(`กำลังอ่านไฟล์...`);
                 
                 const reader = new FileReader();
@@ -4128,7 +4380,7 @@
                             const gData = item.gallery;
                             const pData = item.pages;
                             
-                            delete gData.id; // Remove ID to allow auto-increment (duplicate import)
+                            delete gData.id;
                             if(gData.coverBlob) gData.coverBlob = await DataManager.base64ToBlob(gData.coverBlob);
                             
                             const newId = await db.galleries.add(gData);
@@ -4137,39 +4389,38 @@
                                 galleryId: newId,
                                 order: p.order,
                                 imageBlob: await DataManager.base64ToBlob(p.imageBlob),
-                                translations: p.translations || []
+                                translations: p.translations || [],
+                                translationSets: p.translationSets || []
                             })));
                             
                             if(pagesToSave.length > 0) await db.pages.bulkAdd(pagesToSave);
                             
-                            // อัปเดต progress
                             const percent = 30 + ((index + 1) / total) * 70;
                             progress.update(percent);
                         };
 
                         if (json.type === 'single_gallery') {
                             await importItem(json, 0, 1);
-                            progress.complete('นำเข้าสำเร็จ!');
-                            Toast.success(T('alert_import_success', {count: 1}));
+                            if (!silent) progress.complete('นำเข้าสำเร็จ!');
+                            if (!silent) Toast.success(T('alert_import_success', {count: 1}));
                         } else if (json.type === 'full_backup') {
                             for(let i = 0; i < json.data.length; i++) {
                                 await importItem(json.data[i], i, json.data.length);
                             }
-                            progress.complete('นำเข้าสำเร็จ!');
-                            Toast.success(T('alert_import_success', {count: json.data.length}));
+                            if (!silent) progress.complete('นำเข้าสำเร็จ!');
+                            if (!silent) Toast.success(T('alert_import_success', {count: json.data.length}));
                         } else {
                             progress.error();
                             Toast.error(T('alert_file_error'));
                         }
                         
-                        UI.navigate('home');
+                        if (!silent) UI.navigate('home');
                     } catch(err) { 
                         progress.error();
                         Toast.error(T('alert_import_error') + err.message); 
                     }
                 };
                 reader.readAsText(file);
-                event.target.value = ''; // Reset input
             },
             
             clearBookmark: async (id) => {
@@ -4203,6 +4454,15 @@
                 // Note: Buttons are now managed by the HTML in detail view with proper event handlers
                 
                 const pages = await db.pages.where('galleryId').equals(id).sortBy('order');
+                
+                // โหลด translationSets แล้ว attach เข้า pages (สำหรับการแสดงผล)
+                const allTransSets = await db.translationSets.where('galleryId').equals(id).toArray();
+                pages.forEach(page => {
+                    // สำหรับแต่ละ page ให้มี translationSets array เก็บ { setId, setName, translations }
+                    if (!page.translationSets) page.translationSets = [];
+                    if (!page.translations) page.translations = [];
+                });
+                
                 App.pages = pages;
                 document.getElementById('detPageCount').textContent = pages.length;
 
@@ -5058,12 +5318,14 @@
 
                 const page = App.pages[App.reader.currentIndex];
                 
-                // Get translations from current set or from page if no set selected
+                // Get translations from current set or from page default (from memory)
                 let translations = [];
                 if (App.reader.currentTranslationSetId && page.translationSets) {
+                    // ดึงจากชุดที่เลือก (เก็บไว้ใน page.translationSets)
                     const setData = page.translationSets.find(ts => ts.setId === App.reader.currentTranslationSetId);
                     translations = setData ? setData.translations : [];
                 } else if (page.translations) {
+                    // ดึงจาก default translations
                     translations = page.translations;
                 }
                 
@@ -5197,6 +5459,14 @@
                         App.reader.currentTranslationSetName = set.name;
                     }
                 }
+                
+                // Reload pages from database to get latest translationSets data
+                const latestPages = await db.pages.where('galleryId').equals(App.currentGalleryId).sortBy('order');
+                latestPages.forEach(page => {
+                    if (!page.translationSets) page.translationSets = [];
+                    if (!page.translations) page.translations = [];
+                });
+                App.pages = latestPages;
                 
                 StateManager.save();
                 
