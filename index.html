@@ -435,7 +435,7 @@
                 <a href="#" onclick="UI.navigate('home')" class="text-xl font-bold flex items-center gap-2 navbar-logo-group">
                     <span class="text-nRed hover:scale-110 transition" data-i18n-title="home_title"><i class="fa-solid fa-book-open"></i></span>
                     <span class="hidden sm:inline text-xl text-nRed hover:scale-110 transition" >UGal</span>
-                    <p class="hidden sm:block text-gray-400 text-sm" style="font-size: 12px;">V 0.3.7</p>
+                    <p class="hidden sm:block text-gray-400 text-sm" style="font-size: 12px;">V 0.3.8</p>
                 </a>
                 <div class="hidden md:flex gap-4 text-sm font-semibold text-gray-300">
                     <a href="#" onclick="UI.navigate('home')" class="hover:text-nRed transition" data-i18n-title="home_title" data-i18n="home_page">หน้าหลัก</a>
@@ -608,9 +608,12 @@
                     </div>
                     
                     <div class="col-span-1 md:col-span-2 space-y-4">
-                        <div>
+                        <div class="relative">
                             <label class="block text-sm font-medium text-gray-300 mb-1" data-i18n="title_label">ชื่อเรื่อง (Title)</label>
                             <input type="text" id="upTitle" data-i18n-placeholder="title_placeholder" class="w-full bg-darkBg border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-nRed" placeholder="ใส่ชื่อเรื่อง...">
+                            <div id="titleSuggestionsContainer" class="absolute top-full left-0 right-0 mt-1 bg-darkCard border border-gray-600 rounded shadow-lg max-h-48 overflow-y-auto z-50 hide">
+                                <div id="titleSuggestionsList" class="divide-y divide-gray-700"></div>
+                            </div>
                         </div>
                         <div class="relative">
                             <label class="block text-sm font-medium text-gray-300 mb-1" data-i18n="tags_label">แท็ก (Tags) <span class="text-xs text-gray-500">- คั่นด้วยลูกน้ำ (,)</span></label>
@@ -2127,10 +2130,17 @@
             attachEventListeners: () => {
                 const input = document.getElementById('upTags');
                 if (!input) return;
-                
+
+                input.addEventListener('focus', () => TagSuggestions.showContextSuggestions());
                 input.addEventListener('input', (e) => TagSuggestions.handleInput(e));
                 input.addEventListener('keydown', (e) => TagSuggestions.handleKeydown(e));
-                input.addEventListener('blur', () => setTimeout(() => TagSuggestions.hideSuggestions(), 200));
+                input.addEventListener('focusout', (e) => {
+                    // Only hide if focus didn't go to suggestion container
+                    const container = document.getElementById('tagSuggestionsContainer');
+                    if (!container || !container.contains(e.relatedTarget)) {
+                        setTimeout(() => TagSuggestions.hideSuggestions(), 50);
+                    }
+                });
             },
 
             handleInput: (e) => {
@@ -2152,10 +2162,58 @@
                     .filter(({tag}) => tag.toLowerCase().includes(currentTag.toLowerCase()))
                     .slice(0, 10);
                 
+                const existingTags = UploadContext.get().tags;
+                TagSuggestions.currentSuggestions = TagSuggestions.currentSuggestions
+                    .filter(({tag}) => !existingTags.includes(tag));
+
                 if (TagSuggestions.currentSuggestions.length > 0) {
                     TagSuggestions.renderSuggestions();
                 } else {
                     TagSuggestions.hideSuggestions();
+                }
+            },
+
+            getContextSuggestions: async () => {
+                const context = UploadContext.get();
+                const relatedGalleries = await ContextualSuggestions.getRelatedGalleries(context);
+                const tagMap = {};
+
+                relatedGalleries.forEach(g => {
+                    if (g.tags && Array.isArray(g.tags)) {
+                        g.tags.forEach(tag => {
+                            if (!tag || !tag.trim()) return;
+                            const normalized = tag.trim();
+                            const lastUsed = new Date(g.createdAt || new Date()).getTime();
+                            if (!tagMap[normalized] || lastUsed > tagMap[normalized]) {
+                                tagMap[normalized] = lastUsed;
+                            }
+                        });
+                    }
+                });
+
+                const existingTags = context.tags || [];
+
+                return Object.entries(tagMap)
+                    .map(([tag, lastUsed]) => ({ tag, lastUsed }))
+                    .sort((a, b) => b.lastUsed - a.lastUsed)
+                    .map(item => item.tag)
+                    .filter(tag => !existingTags.includes(tag))
+                    .slice(0, 5);
+            },
+
+            showContextSuggestions: async () => {
+                let suggestions = await TagSuggestions.getContextSuggestions();
+                // ไม่แสดง fallback ถ้าไม่มี context suggestions
+                if (!suggestions || suggestions.length === 0) {
+                    TagSuggestions.hideSuggestions();
+                    return;
+                }
+
+                TagSuggestions.currentSuggestions = suggestions.map(tag => ({ tag }));
+                TagSuggestions.selectedIndex = -1;
+
+                if (TagSuggestions.currentSuggestions.length > 0) {
+                    TagSuggestions.renderSuggestions();
                 }
             },
 
@@ -2215,10 +2273,11 @@
                 const newValue = (beforeTag + ' ' + tag + ', ').replace(/^\s*,\s*/, '').replace(/^\s+/, '');
                 
                 input.value = newValue;
-                TagSuggestions.hideSuggestions();
                 input.focus();
                 // Move cursor to end
                 input.setSelectionRange(input.value.length, input.value.length);
+                // Refresh suggestions for the new input state
+                TagSuggestions.handleInput({target: input});
             },
 
             renderSuggestions: () => {
@@ -2232,7 +2291,11 @@
                         isSelected ? 'bg-nRed text-white' : 'hover:bg-gray-700 text-gray-300'
                     }`;
                     item.textContent = tag;
-                    item.onclick = () => TagSuggestions.selectTag(tag);
+                    // ใช้ mousedown แทน onclick เพื่อให้ blur ไม่ trigger
+                    item.onmousedown = (e) => {
+                        e.preventDefault();
+                        TagSuggestions.selectTag(tag);
+                    };
                     list.appendChild(item);
                 });
                 
@@ -2242,6 +2305,243 @@
             hideSuggestions: () => {
                 document.getElementById('tagSuggestionsContainer').classList.add('hide');
                 TagSuggestions.selectedIndex = -1;
+            }
+        };
+
+        // ================= UPLOAD CONTEXT + RELATION HELPERS =================
+        const UploadContext = {
+            get: () => {
+                const getList = (id) => {
+                    const value = (document.getElementById(id)?.value || '').split(',').map(item => item.trim()).filter(Boolean);
+                    return value;
+                };
+                return {
+                    title: (document.getElementById('upTitle')?.value || '').trim(),
+                    tags: getList('upTags'),
+                    artists: getList('upArtists'),
+                    characters: getList('upCharacters'),
+                    series: getList('upSeries')
+                };
+            }
+        };
+
+        const ContextualSuggestions = {
+            getRelatedGalleries: async (context) => {
+                const galleries = await db.galleries.toArray();
+
+                const hasContext =
+                    context.title ||
+                    (context.tags && context.tags.length > 0) ||
+                    (context.artists && context.artists.length > 0) ||
+                    (context.characters && context.characters.length > 0) ||
+                    (context.series && context.series.length > 0);
+
+                if (!hasContext) {
+                    return galleries;
+                }
+
+                return galleries.filter(g => {
+                    if (context.title && g.title && g.title.toLowerCase() === context.title.toLowerCase()) {
+                        return true;
+                    }
+
+                    if (context.artists && context.artists.length > 0 && g.artists && Array.isArray(g.artists)) {
+                        if (g.artists.some(a => context.artists.includes(a))) return true;
+                    }
+
+                    if (context.characters && context.characters.length > 0 && g.characters && Array.isArray(g.characters)) {
+                        if (g.characters.some(c => context.characters.includes(c))) return true;
+                    }
+
+                    if (context.series && context.series.length > 0 && g.series && Array.isArray(g.series)) {
+                        if (g.series.some(s => context.series.includes(s))) return true;
+                    }
+
+                    if (context.tags && context.tags.length > 0 && g.tags && Array.isArray(g.tags)) {
+                        if (g.tags.some(t => context.tags.includes(t))) return true;
+                    }
+
+                    return false;
+                });
+            }
+        };
+
+        // ================= TITLE SUGGESTIONS MANAGER =================
+        const TitleSuggestions = {
+            allTitles: [],
+            currentSuggestions: [],
+            selectedIndex: -1,
+
+            init: async () => {
+                await TitleSuggestions.loadAllTitles();
+                TitleSuggestions.attachEventListeners();
+            },
+
+            loadAllTitles: async () => {
+                try {
+                    const galleries = await db.galleries.toArray();
+                    const titleMap = {};
+
+                    galleries.forEach(g => {
+                        const title = (g.title || '').trim();
+                        if (!title) return;
+                        const createdAt = new Date(g.createdAt || new Date()).getTime();
+                        if (!titleMap[title] || createdAt > titleMap[title]) {
+                            titleMap[title] = createdAt;
+                        }
+                    });
+
+                    TitleSuggestions.allTitles = Object.entries(titleMap)
+                        .map(([title, lastUsed]) => ({ title, lastUsed: new Date(lastUsed) }))
+                        .sort((a, b) => b.lastUsed - a.lastUsed)
+                        .slice(0, 100);
+                } catch (e) {
+                    console.error('Error loading titles:', e);
+                }
+            },
+
+            attachEventListeners: () => {
+                const input = document.getElementById('upTitle');
+                if (!input) return;
+
+                input.addEventListener('focus', () => TitleSuggestions.showContextSuggestions());
+                input.addEventListener('input', (e) => TitleSuggestions.handleInput(e));
+                input.addEventListener('keydown', (e) => TitleSuggestions.handleKeydown(e));
+                input.addEventListener('focusout', (e) => {
+                    const container = document.getElementById('titleSuggestionsContainer');
+                    if (!container || !container.contains(e.relatedTarget)) {
+                        setTimeout(() => TitleSuggestions.hideSuggestions(), 50);
+                    }
+                });
+            },
+
+            getContextSuggestions: async () => {
+                const context = UploadContext.get();
+                if (!context) return [];
+
+                const relatedGalleries = await ContextualSuggestions.getRelatedGalleries(context);
+                const titleMap = {};
+
+                relatedGalleries.forEach(g => {
+                    const title = (g.title || '').trim();
+                    if (!title) return;
+                    const createdAt = new Date(g.createdAt || new Date()).getTime();
+                    if (!titleMap[title] || createdAt > titleMap[title]) {
+                        titleMap[title] = createdAt;
+                    }
+                });
+
+                const suggestions = Object.entries(titleMap)
+                    .map(([title, lastUsed]) => ({ title, lastUsed: new Date(lastUsed) }))
+                    .sort((a, b) => b.lastUsed - a.lastUsed)
+                    .slice(0, 5)
+                    .map(item => item.title);
+
+                if (suggestions.length === 0) {
+                    return TitleSuggestions.allTitles.slice(0, 5).map(item => item.title);
+                }
+
+                return suggestions;
+            },
+
+            showContextSuggestions: async () => {
+                let suggestions = await TitleSuggestions.getContextSuggestions();
+
+                if (!suggestions || suggestions.length === 0) {
+                    TitleSuggestions.hideSuggestions();
+                    return;
+                }
+
+                TitleSuggestions.currentSuggestions = suggestions.map(title => ({ title }));
+                TitleSuggestions.selectedIndex = -1;
+
+                if (TitleSuggestions.currentSuggestions.length > 0) {
+                    TitleSuggestions.renderSuggestions();
+                }
+            },
+
+            handleInput: (e) => {
+                const input = e.target;
+                const query = input.value.trim().toLowerCase();
+
+                if (query.length === 0) {
+                    TitleSuggestions.showContextSuggestions();
+                    return;
+                }
+
+                TitleSuggestions.currentSuggestions = TitleSuggestions.allTitles
+                    .filter(item => item.title.toLowerCase().includes(query))
+                    .slice(0, 10)
+                    .map(item => ({ title: item.title }));
+
+                TitleSuggestions.selectedIndex = -1;
+
+                if (TitleSuggestions.currentSuggestions.length > 0) {
+                    TitleSuggestions.renderSuggestions();
+                } else {
+                    TitleSuggestions.hideSuggestions();
+                }
+            },
+
+            handleKeydown: (e) => {
+                const container = document.getElementById('titleSuggestionsContainer');
+                if (!container) return;
+
+                switch (e.key) {
+                    case 'ArrowDown':
+                        if (container.classList.contains('hide')) return;
+                        e.preventDefault();
+                        TitleSuggestions.selectedIndex = Math.min(TitleSuggestions.selectedIndex + 1, TitleSuggestions.currentSuggestions.length - 1);
+                        TitleSuggestions.renderSuggestions();
+                        break;
+                    case 'ArrowUp':
+                        if (container.classList.contains('hide')) return;
+                        e.preventDefault();
+                        TitleSuggestions.selectedIndex = Math.max(TitleSuggestions.selectedIndex - 1, -1);
+                        TitleSuggestions.renderSuggestions();
+                        break;
+                    case 'Enter':
+                        if (TitleSuggestions.selectedIndex >= 0 && !container.classList.contains('hide')) {
+                            e.preventDefault();
+                            TitleSuggestions.selectTitle(TitleSuggestions.currentSuggestions[TitleSuggestions.selectedIndex].title);
+                        }
+                        break;
+                    case 'Escape':
+                        TitleSuggestions.hideSuggestions();
+                        break;
+                }
+            },
+
+            selectTitle: (title) => {
+                const input = document.getElementById('upTitle');
+                input.value = title;
+                TitleSuggestions.hideSuggestions();
+                input.focus();
+                input.setSelectionRange(input.value.length, input.value.length);
+            },
+
+            renderSuggestions: () => {
+                const list = document.getElementById('titleSuggestionsList');
+                list.innerHTML = '';
+
+                TitleSuggestions.currentSuggestions.forEach(({ title }, index) => {
+                    const isSelected = index === TitleSuggestions.selectedIndex;
+                    const item = document.createElement('div');
+                    item.className = `px-3 py-2 cursor-pointer transition ${isSelected ? 'bg-nRed text-white' : 'hover:bg-gray-700 text-gray-300'}`;
+                    item.textContent = title;
+                    item.onmousedown = (e) => {
+                        e.preventDefault();
+                        TitleSuggestions.selectTitle(title);
+                    };
+                    list.appendChild(item);
+                });
+
+                document.getElementById('titleSuggestionsContainer').classList.remove('hide');
+            },
+
+            hideSuggestions: () => {
+                document.getElementById('titleSuggestionsContainer').classList.add('hide');
+                TitleSuggestions.selectedIndex = -1;
             }
         };
 
@@ -2566,10 +2866,16 @@
             attachEventListeners: () => {
                 const input = document.getElementById('upArtists');
                 if (!input) return;
-                
+
+                input.addEventListener('focus', () => ArtistSuggestions.showContextSuggestions());
                 input.addEventListener('input', (e) => ArtistSuggestions.handleInput(e));
                 input.addEventListener('keydown', (e) => ArtistSuggestions.handleKeydown(e));
-                input.addEventListener('blur', () => setTimeout(() => ArtistSuggestions.hideSuggestions(), 200));
+                input.addEventListener('focusout', (e) => {
+                    const container = document.getElementById('artistSuggestionsContainer');
+                    if (!container || !container.contains(e.relatedTarget)) {
+                        setTimeout(() => ArtistSuggestions.hideSuggestions(), 50);
+                    }
+                });
             },
 
             handleInput: (e) => {
@@ -2589,12 +2895,60 @@
                 // Filter suggestions - top 10 matching current artist
                 ArtistSuggestions.currentSuggestions = ArtistSuggestions.allArtists
                     .filter(({artist}) => artist.toLowerCase().includes(currentArtist.toLowerCase()))
+                    .map(item => ({ artist: item.artist }))
                     .slice(0, 10);
-                
+
+                const existingArtists = UploadContext.get().artists;
+                ArtistSuggestions.currentSuggestions = ArtistSuggestions.currentSuggestions
+                    .filter(({artist}) => !existingArtists.includes(artist));
+
                 if (ArtistSuggestions.currentSuggestions.length > 0) {
                     ArtistSuggestions.renderSuggestions();
                 } else {
                     ArtistSuggestions.hideSuggestions();
+                }
+            },
+
+            getContextSuggestions: async () => {
+                const context = UploadContext.get();
+                const relatedGalleries = await ContextualSuggestions.getRelatedGalleries(context);
+                const artistMap = {};
+
+                relatedGalleries.forEach(g => {
+                    if (g.artists && Array.isArray(g.artists)) {
+                        g.artists.forEach(artist => {
+                            if (!artist || !artist.trim()) return;
+                            const normalized = artist.trim();
+                            const lastUsed = new Date(g.createdAt || new Date()).getTime();
+                            if (!artistMap[normalized] || lastUsed > artistMap[normalized]) {
+                                artistMap[normalized] = lastUsed;
+                            }
+                        });
+                    }
+                });
+
+                const existingArtists = context.artists || [];
+
+                return Object.entries(artistMap)
+                    .map(([artist, lastUsed]) => ({ artist, lastUsed }))
+                    .sort((a, b) => b.lastUsed - a.lastUsed)
+                    .map(item => item.artist)
+                    .filter(artist => !existingArtists.includes(artist))
+                    .slice(0, 5);
+            },
+
+            showContextSuggestions: async () => {
+                let suggestions = await ArtistSuggestions.getContextSuggestions();
+                if (!suggestions || suggestions.length === 0) {
+                    ArtistSuggestions.hideSuggestions();
+                    return;
+                }
+
+                ArtistSuggestions.currentSuggestions = suggestions.map(artist => ({ artist }));
+                ArtistSuggestions.selectedIndex = -1;
+
+                if (ArtistSuggestions.currentSuggestions.length > 0) {
+                    ArtistSuggestions.renderSuggestions();
                 }
             },
 
@@ -2654,10 +3008,11 @@
                 const newValue = (beforeArtist + ' ' + artist + ', ').replace(/^\s*,\s*/, '').replace(/^\s+/, '');
                 
                 input.value = newValue;
-                ArtistSuggestions.hideSuggestions();
                 input.focus();
                 // Move cursor to end
                 input.setSelectionRange(input.value.length, input.value.length);
+                // Refresh suggestions for the new input state
+                ArtistSuggestions.handleInput({target: input});
             },
 
             renderSuggestions: () => {
@@ -2671,7 +3026,10 @@
                         isSelected ? 'bg-nRed text-white' : 'hover:bg-gray-700 text-gray-300'
                     }`;
                     item.textContent = artist;
-                    item.onclick = () => ArtistSuggestions.selectArtist(artist);
+                    item.onmousedown = (e) => {
+                        e.preventDefault();
+                        ArtistSuggestions.selectArtist(artist);
+                    };
                     list.appendChild(item);
                 });
                 
@@ -2727,10 +3085,16 @@
             attachEventListeners: () => {
                 const input = document.getElementById('upCharacters');
                 if (!input) return;
-                
+
+                input.addEventListener('focus', () => CharacterSuggestions.showContextSuggestions());
                 input.addEventListener('input', (e) => CharacterSuggestions.handleInput(e));
                 input.addEventListener('keydown', (e) => CharacterSuggestions.handleKeydown(e));
-                input.addEventListener('blur', () => setTimeout(() => CharacterSuggestions.hideSuggestions(), 200));
+                input.addEventListener('focusout', (e) => {
+                    const container = document.getElementById('characterSuggestionsContainer');
+                    if (!container || !container.contains(e.relatedTarget)) {
+                        setTimeout(() => CharacterSuggestions.hideSuggestions(), 50);
+                    }
+                });
             },
 
             handleInput: (e) => {
@@ -2750,12 +3114,60 @@
                 // Filter suggestions - top 10 matching current character
                 CharacterSuggestions.currentSuggestions = CharacterSuggestions.allCharacters
                     .filter(({character}) => character.toLowerCase().includes(currentCharacter.toLowerCase()))
+                    .map(item => ({ character: item.character }))
                     .slice(0, 10);
-                
+
+                const existingCharacters = UploadContext.get().characters;
+                CharacterSuggestions.currentSuggestions = CharacterSuggestions.currentSuggestions
+                    .filter(({character}) => !existingCharacters.includes(character));
+
                 if (CharacterSuggestions.currentSuggestions.length > 0) {
                     CharacterSuggestions.renderSuggestions();
                 } else {
                     CharacterSuggestions.hideSuggestions();
+                }
+            },
+
+            getContextSuggestions: async () => {
+                const context = UploadContext.get();
+                const relatedGalleries = await ContextualSuggestions.getRelatedGalleries(context);
+                const characterMap = {};
+
+                relatedGalleries.forEach(g => {
+                    if (g.characters && Array.isArray(g.characters)) {
+                        g.characters.forEach(character => {
+                            if (!character || !character.trim()) return;
+                            const normalized = character.trim();
+                            const lastUsed = new Date(g.createdAt || new Date()).getTime();
+                            if (!characterMap[normalized] || lastUsed > characterMap[normalized]) {
+                                characterMap[normalized] = lastUsed;
+                            }
+                        });
+                    }
+                });
+
+                const existingCharacters = context.characters || [];
+
+                return Object.entries(characterMap)
+                    .map(([character, lastUsed]) => ({ character, lastUsed }))
+                    .sort((a, b) => b.lastUsed - a.lastUsed)
+                    .map(item => item.character)
+                    .filter(character => !existingCharacters.includes(character))
+                    .slice(0, 5);
+            },
+
+            showContextSuggestions: async () => {
+                let suggestions = await CharacterSuggestions.getContextSuggestions();
+                if (!suggestions || suggestions.length === 0) {
+                    CharacterSuggestions.hideSuggestions();
+                    return;
+                }
+
+                CharacterSuggestions.currentSuggestions = suggestions.map(character => ({ character }));
+                CharacterSuggestions.selectedIndex = -1;
+
+                if (CharacterSuggestions.currentSuggestions.length > 0) {
+                    CharacterSuggestions.renderSuggestions();
                 }
             },
 
@@ -2815,10 +3227,11 @@
                 const newValue = (beforeCharacter + ' ' + character + ', ').replace(/^\s*,\s*/, '').replace(/^\s+/, '');
                 
                 input.value = newValue;
-                CharacterSuggestions.hideSuggestions();
                 input.focus();
                 // Move cursor to end
                 input.setSelectionRange(input.value.length, input.value.length);
+                // Refresh suggestions for the new input state
+                CharacterSuggestions.handleInput({target: input});
             },
 
             renderSuggestions: () => {
@@ -2832,7 +3245,10 @@
                         isSelected ? 'bg-nRed text-white' : 'hover:bg-gray-700 text-gray-300'
                     }`;
                     item.textContent = character;
-                    item.onclick = () => CharacterSuggestions.selectCharacter(character);
+                    item.onmousedown = (e) => {
+                        e.preventDefault();
+                        CharacterSuggestions.selectCharacter(character);
+                    };
                     list.appendChild(item);
                 });
                 
@@ -2888,10 +3304,16 @@
             attachEventListeners: () => {
                 const input = document.getElementById('upSeries');
                 if (!input) return;
-                
+
+                input.addEventListener('focus', () => SeriesSuggestions.showContextSuggestions());
                 input.addEventListener('input', (e) => SeriesSuggestions.handleInput(e));
                 input.addEventListener('keydown', (e) => SeriesSuggestions.handleKeydown(e));
-                input.addEventListener('blur', () => setTimeout(() => SeriesSuggestions.hideSuggestions(), 200));
+                input.addEventListener('focusout', (e) => {
+                    const container = document.getElementById('seriesSuggestionsContainer');
+                    if (!container || !container.contains(e.relatedTarget)) {
+                        setTimeout(() => SeriesSuggestions.hideSuggestions(), 50);
+                    }
+                });
             },
 
             handleInput: (e) => {
@@ -2911,12 +3333,60 @@
                 // Filter suggestions - top 10 matching current series
                 SeriesSuggestions.currentSuggestions = SeriesSuggestions.allSeries
                     .filter(({series}) => series.toLowerCase().includes(currentSeries.toLowerCase()))
+                    .map(item => ({ series: item.series }))
                     .slice(0, 10);
-                
+
+                const existingSeries = UploadContext.get().series;
+                SeriesSuggestions.currentSuggestions = SeriesSuggestions.currentSuggestions
+                    .filter(({series}) => !existingSeries.includes(series));
+
                 if (SeriesSuggestions.currentSuggestions.length > 0) {
                     SeriesSuggestions.renderSuggestions();
                 } else {
                     SeriesSuggestions.hideSuggestions();
+                }
+            },
+
+            getContextSuggestions: async () => {
+                const context = UploadContext.get();
+                const relatedGalleries = await ContextualSuggestions.getRelatedGalleries(context);
+                const seriesMap = {};
+
+                relatedGalleries.forEach(g => {
+                    if (g.series && Array.isArray(g.series)) {
+                        g.series.forEach(series => {
+                            if (!series || !series.trim()) return;
+                            const normalized = series.trim();
+                            const lastUsed = new Date(g.createdAt || new Date()).getTime();
+                            if (!seriesMap[normalized] || lastUsed > seriesMap[normalized]) {
+                                seriesMap[normalized] = lastUsed;
+                            }
+                        });
+                    }
+                });
+
+                const existingSeries = context.series || [];
+
+                return Object.entries(seriesMap)
+                    .map(([series, lastUsed]) => ({ series, lastUsed }))
+                    .sort((a, b) => b.lastUsed - a.lastUsed)
+                    .map(item => item.series)
+                    .filter(series => !existingSeries.includes(series))
+                    .slice(0, 5);
+            },
+
+            showContextSuggestions: async () => {
+                let suggestions = await SeriesSuggestions.getContextSuggestions();
+                if (!suggestions || suggestions.length === 0) {
+                    SeriesSuggestions.hideSuggestions();
+                    return;
+                }
+
+                SeriesSuggestions.currentSuggestions = suggestions.map(series => ({ series }));
+                SeriesSuggestions.selectedIndex = -1;
+
+                if (SeriesSuggestions.currentSuggestions.length > 0) {
+                    SeriesSuggestions.renderSuggestions();
                 }
             },
 
@@ -2976,10 +3446,11 @@
                 const newValue = (beforeSeries + ' ' + series + ', ').replace(/^\s*,\s*/, '').replace(/^\s+/, '');
                 
                 input.value = newValue;
-                SeriesSuggestions.hideSuggestions();
                 input.focus();
                 // Move cursor to end
                 input.setSelectionRange(input.value.length, input.value.length);
+                // Refresh suggestions for the new input state
+                SeriesSuggestions.handleInput({target: input});
             },
 
             renderSuggestions: () => {
@@ -2993,7 +3464,10 @@
                         isSelected ? 'bg-nRed text-white' : 'hover:bg-gray-700 text-gray-300'
                     }`;
                     item.textContent = series;
-                    item.onclick = () => SeriesSuggestions.selectSeries(series);
+                    item.onmousedown = (e) => {
+                        e.preventDefault();
+                        SeriesSuggestions.selectSeries(series);
+                    };
                     list.appendChild(item);
                 });
                 
@@ -3323,7 +3797,8 @@
                         await FileSystemManager.syncToLocal(galleryId);
                     }
 
-                    // Reload suggestions with newly added/updated tags, artists, characters, and series
+                    // Reload suggestions with newly added/updated titles, tags, artists, characters, and series
+                    await TitleSuggestions.loadAllTitles();
                     await TagSuggestions.loadAllTags();
                     await ArtistSuggestions.loadAllArtists();
                     await CharacterSuggestions.loadAllCharacters();
@@ -5167,6 +5642,7 @@
             PDFConverter.init();
             UploadManager.initDragAndDrop();
             TagSuggestions.init();
+            TitleSuggestions.init();
             SearchSuggestions.init();
             ArtistSuggestions.init();
             CharacterSuggestions.init();
