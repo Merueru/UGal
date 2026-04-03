@@ -853,7 +853,7 @@
                     <button onclick="Reader.changeFormat('bg', 'white')" class="w-5 h-5 rounded-full bg-white border border-gray-400" data-i18n-title="bg_white_title" title="พื้นขาว"></button>
                     <button onclick="Reader.changeFormat('bg', 'black')" class="w-5 h-5 rounded-full bg-black border border-gray-400" data-i18n-title="bg_black_title" title="พื้นดำ"></button>
                     <button onclick="Reader.changeFormat('bg', 'clear')" class="w-5 h-5 rounded-full bg-transparent border border-gray-400 relative overflow-hidden" data-i18n-title="bg_clear_title" title="พื้นใส">
-                        <div class="absolute inset-0 bg-[url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAOklEQVQYV2N89erVfwY0ICYmBiuE8UlgE2QVEI1E2QQ1EQSIsgmIJiI0ES3B1BfUfEA+gE8/UCQBAgCG6x2578y9vAAAAABJRU5ErkJggg==')]"></div>
+                        <div class="absolute inset-0 bg-[url('data:image/webp;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAOklEQVQYV2N89erVfwY0ICYmBiuE8UlgE2QVEI1E2QQ1EQSIsgmIJiI0ES3B1BfUfEA+gE8/UCQBAgCG6x2578y9vAAAAABJRU5ErkJggg==')]"></div>
                     </button>
                     <div class="w-px h-4 bg-yellow-800 mx-1"></div>
                     <button onclick="Reader.changeFormat('color', 'black')" class="px-2 hover:bg-yellow-800 rounded font-bold text-black text-shadow-none" data-i18n-title="color_black_title" title="ตัวอักษรดำ">T</button>
@@ -1318,7 +1318,7 @@
 
         // ================= DATABASE (Dexie.js) v3 =================
         const db = new Dexie("UGalDB");
-        db.version(87).stores({
+        db.version(88).stores({
             galleries: '++id, title, createdAt, isFavorite, lastReadPage, lastAccessedAt, totalPages, viewCount',
             pages: '++id, galleryId, order',
             settings: 'key',
@@ -2054,7 +2054,7 @@
                                         const imageData = {
                                             blob: blob,
                                             pageNum: pageNum,
-                                            fileName: `page_${pageNum}.png`
+                                            fileName: `page_${pageNum}.webp`
                                         };
                                         imageBlobs.push(imageData);
                                         completedPages++;
@@ -2069,7 +2069,7 @@
                                             resolve(imageBlobs);
                                         }
                                     }
-                                }, 'image/png', 0.95); // คุณภาพ 95% 
+                                }, 'image/webp', 0.9); // คุณภาพ 95% 
                             }
                             
                         } catch (error) {
@@ -3647,7 +3647,7 @@
                                     // เพิ่มรูปไปยัง pageFiles ทันที
                                     UploadManager.pageFiles.push({
                                         id: Date.now() + Math.random() + completed,
-                                        file: new File([imageData.blob], imageData.fileName, { type: 'image/png' }),
+                                        file: new File([imageData.blob], imageData.fileName, { type: 'image/webp' }),
                                         url: URL.createObjectURL(imageData.blob)
                                     });
                                     
