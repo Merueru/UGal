@@ -501,6 +501,45 @@
             50% { opacity: 1; }
             100% { opacity: 1; }
         }
+
+        /* Multi-Export Selction Styles */
+        .gallery-card.selected-for-export {
+            border: 3px solid #10b981 !important;
+            box-shadow: 0 0 8px rgba(16, 185, 129, 0.5) !important;
+        }
+
+        .export-checkbox {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            width: 24px;
+            height: 24px;
+            background: rgba(16, 185, 129, 0.9);
+            border: 2px solid #10b981;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 25;
+            transition: all 0.2s ease;
+            font-size: 14px;
+            color: white;
+        }
+
+        .export-checkbox:hover {
+            background: rgba(16, 185, 129, 1);
+            transform: scale(1.1);
+        }
+
+        .export-checkbox.unchecked {
+            background: rgba(100, 116, 139, 0.7);
+            border-color: #64748b;
+        }
+
+        .export-checkbox.unchecked:hover {
+            background: rgba(100, 116, 139, 0.9);
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -515,7 +554,7 @@
                 <a href="#" onclick="UI.navigate('home')" class="text-xl font-bold flex items-center gap-2 navbar-logo-group">
                     <span class="text-nRed hover:scale-110 transition" data-i18n-title="home_title"><i class="fa-solid fa-book-open"></i></span>
                     <span class="hidden sm:inline text-xl text-nRed hover:scale-110 transition" >UGal</span>
-                    <p class="hidden sm:block text-gray-400 text-sm" style="font-size: 12px;">V 0.4.1</p>
+                    <p class="hidden sm:block text-gray-400 text-sm" style="font-size: 12px;">V 0.4.2</p>
                 </a>
                 <div class="hidden md:flex gap-4 text-sm font-semibold text-gray-300">
                     <a href="#" onclick="UI.navigate('home')" class="hover:text-nRed transition" data-i18n-title="home_title" data-i18n="home_page">หน้าหลัก</a>
@@ -549,9 +588,23 @@
                 </div>
                 
                 <div class="hidden md:flex items-center gap-2 ml-2 border-l border-gray-600 pl-4">
-                    <button onclick="DataManager.exportAll()" class="bg-gray-700 hover:bg-green-600 px-3 py-1.5 rounded-full text-white transition" data-i18n-title="export_title" title="ส่งออกข้อมูลทั้งหมด (Backup)">
-                        <i class="fa-solid fa-file-export"></i>
-                    </button>
+                    <!-- Export Dropdown Menu -->
+                    <div class="relative group">
+                        <button class="bg-gray-700 hover:bg-green-600 px-3 py-1.5 rounded-full text-white transition flex items-center gap-1" data-i18n-title="export_menu_title" title="ส่งออก">
+                            <i class="fa-solid fa-file-export"></i>
+                            <i class="fa-solid fa-chevron-down text-xs"></i>
+                        </button>
+                        <!-- Dropdown Menu -->
+                        <div class="absolute right-0 mt-0 w-48 bg-darkCard border border-gray-600 rounded shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                            <button onclick="DataManager.exportAll()" class="w-full text-left px-4 py-2 hover:bg-gray-700 transition text-sm text-white flex items-center gap-2 border-b border-gray-600" data-i18n="export_all_option">
+                                <i class="fa-solid fa-download"></i> ส่งออกข้อมูลทั้งหมด
+                            </button>
+                            <button onclick="MultiExportManager.startSelectMode()" class="w-full text-left px-4 py-2 hover:bg-gray-700 transition text-sm text-white flex items-center gap-2" data-i18n="export_selected_option">
+                                <i class="fa-solid fa-hand-pointer"></i> ส่งออกที่เลือก
+                            </button>
+                        </div>
+                    </div>
+                    
                     <button onclick="document.getElementById('importInput').click()" class="bg-gray-700 hover:bg-blue-500 px-3 py-1.5 rounded-full text-white transition" data-i18n-title="import_title" title="นำเข้าข้อมูล (Restore)">
                         <i class="fa-solid fa-file-import"></i>
                     </button>
@@ -654,6 +707,17 @@
                         <option value="shuffle" data-i18n="sort_shuffle">สุ่ม</option>
                     </select>
                     <span id="gridCount" class="text-gray-400 text-sm">0 รายการ</span>
+                    
+                    <!-- Multi-Export Controls (Hidden by default) -->
+                    <div id="multiExportControls" class="hide flex items-center gap-2">
+                        <span id="exportSelectedCount" class="text-gray-400 text-sm font-semibold">เลือก 0 เรื่อง</span>
+                        <button onclick="MultiExportManager.exportSelected()" class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm transition text-white font-semibold flex items-center gap-1">
+                            <i class="fa-solid fa-download"></i> ส่งออก
+                        </button>
+                        <button onclick="MultiExportManager.cancelSelectMode()" class="bg-gray-600 hover:bg-gray-700 px-3 py-1 rounded text-sm transition text-white flex items-center gap-1">
+                            <i class="fa-solid fa-xmark"></i> ยกเลิก
+                        </button>
+                    </div>
                 </div>
             </div>
             <div id="gallery-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"></div>
@@ -1150,6 +1214,9 @@
             error: function(message, duration = 5000) {
                 this.show(message, 'error', duration);
             },
+            warn: function(message, duration = 5000) {
+                this.show(message, 'progress', duration);
+            },
             info: function(message, duration = 5000) {
                 this.show(message, 'info', duration);
             },
@@ -1258,7 +1325,12 @@
                 sort_most_viewed: "อ่านบ่อยสุด", sort_least_viewed: "อ่านน้อยสุด",
                 storage_usage: "พื้นที่เก็บข้อมูล", storage_used: "ใช้ไป", storage_total: "เต็ม", storage_percent: "ใช้ไป", refresh_storage_btn: "อัปเดต", storage_info: "ข้อมูล IndexedDB",
                 watch_later: '<i class="fa-solid fa-eye text-cyan-400"></i> ดูภายหลัง', watch_later_list: "ดูภายหลัง", add_to_watch_later: "เพิ่มไปดูภายหลัง", added_to_watch_later: "เพิ่มไปดูภายหลังแล้ว",
-                replace_image_title: "แทนที่รูปนี้", replace_image: "แทนที่"
+                replace_image_title: "แทนที่รูปนี้", replace_image: "แทนที่",
+                export_menu_title: "ส่งออก", export_all_option: "ส่งออกข้อมูลทั้งหมด", export_selected_option: "ส่งออกที่เลือก",
+                export_selected_count: "เลือก {count} เรื่อง", export_cancel_btn: "ยกเลิก", export_selected_none_error: "กรุณาเลือกเรื่องที่ต้องการส่งออก",
+                export_file_too_large: "ไฟล์มีขนาดใหญ่เกินไป ({size}MB). แนะนำให้ส่งออกแบบแยก",
+                export_multiple_confirm: "ต้องการส่งออก {{count}} เรื่อง? ไฟล์รวมมีขนาด ~{{size}}MB",
+                export_queue_started: "เริ่มสร้างคิวการดาวน์โหลด..."
             },
             en: {
                 decrease_size_title: "Decrease text size", increase_size_title: "Increase text size", shape_rect_title: "Rectangle", bg_white_title: "White background", bg_black_title: "Black background", bg_clear_title: "Transparent background", color_black_title: "Black text", color_white_title: "White text",
@@ -1306,7 +1378,12 @@
                 sort_most_viewed: "Most Viewed", sort_least_viewed: "Least Viewed",
                 storage_usage: "Storage Usage", storage_used: "Used", storage_total: "Total", storage_percent: "Used", refresh_storage_btn: "Refresh", storage_info: "IndexedDB Storage",
                 watch_later: '<i class="fa-solid fa-eye text-cyan-400"></i> Watch Later', watch_later_list: "Watch Later", add_to_watch_later: "Add to Watch Later", added_to_watch_later: "Added to Watch Later",
-                replace_image_title: "Replace this image", replace_image: "Replace"
+                replace_image_title: "Replace this image", replace_image: "Replace",
+                export_menu_title: "Export", export_all_option: "Export All", export_selected_option: "Export Selected",
+                export_selected_count: "Selected {count} items", export_cancel_btn: "Cancel", export_selected_none_error: "Please select items to export",
+                export_file_too_large: "File is too large ({size}MB). Recommended to export separately",
+                export_multiple_confirm: "Export {{count}} items? Total file size ~{{size}}MB",
+                export_queue_started: "Starting download queue..."
             },
             cn: {
                 decrease_size_title: "减小文字大小", increase_size_title: "增大文字大小", shape_rect_title: "矩形", bg_white_title: "白色背景", bg_black_title: "黑色背景", bg_clear_title: "透明背景", color_black_title: "黑色文字", color_white_title: "白色文字",
@@ -1354,7 +1431,12 @@
                 sort_most_viewed: "最常查看", sort_least_viewed: "最少查看",
                 storage_usage: "数据存储", storage_used: "已用", storage_total: "总容量", storage_percent: "已用", refresh_storage_btn: "刷新", storage_info: "IndexedDB 存储",
                 watch_later: '<i class="fa-solid fa-eye text-cyan-400"></i> 稍后查看', watch_later_list: "稍后查看", add_to_watch_later: "添加到稍后查看", added_to_watch_later: "已添加到稍后查看",
-                replace_image_title: "替换此图片", replace_image: "替换"
+                replace_image_title: "替换此图片", replace_image: "替换",
+                export_menu_title: "导出", export_all_option: "导出全部", export_selected_option: "导出所选",
+                export_selected_count: "已选择 {count} 项", export_cancel_btn: "取消", export_selected_none_error: "请选择要导出的项目",
+                export_file_too_large: "文件过大 ({size}MB). 建议分别导出",
+                export_multiple_confirm: "导出 {{count}} 项? 总文件大小约 {{size}}MB",
+                export_queue_started: "开始下载队列..."
             },
             jp: {
                 decrease_size_title: "テキストサイズを縮小", increase_size_title: "テキストサイズを拡大", shape_rect_title: "矩形", bg_white_title: "白い背景", bg_black_title: "黒い背景", bg_clear_title: "透明な背景", color_black_title: "黒いテキスト", color_white_title: "白いテキスト",
@@ -1402,7 +1484,12 @@
                 sort_most_viewed: "最も多く読まれた", sort_least_viewed: "最も読まれていない",
                 storage_usage: "ストレージ使用量", storage_used: "使用", storage_total: "容量", storage_percent: "使用", refresh_storage_btn: "更新", storage_info: "IndexedDB ストレージ",
                 watch_later: '<i class="fa-solid fa-eye text-cyan-400"></i> あとで見る', watch_later_list: "あとで見る", add_to_watch_later: "あとで見るに追加", added_to_watch_later: "あとで見るに追加しました",
-                replace_image_title: "この画像を置き換え", replace_image: "置き換え"
+                replace_image_title: "この画像を置き換え", replace_image: "置き換え",
+                export_menu_title: "書き出し", export_all_option: "すべて書き出し", export_selected_option: "選択したものを書き出し",
+                export_selected_count: "{count} 件を選択", export_cancel_btn: "キャンセル", export_selected_none_error: "書き出すアイテムを選択してください",
+                export_file_too_large: "ファイルが大きすぎます ({size}MB). 別々に書き出すことをお勧めします",
+                export_multiple_confirm: "{{count}} 件を書き出しますか? 合計ファイルサイズ約 {{size}}MB",
+                export_queue_started: "ダウンロードキューを開始中..."
             }
         };
 
@@ -2211,17 +2298,22 @@
                         const hasProgress = (g.lastReadPage !== undefined && g.lastReadPage !== null && g.totalPages);
                         const progressText = hasProgress ? T('read_progress', {current: g.lastReadPage + 1, total: g.totalPages}) : '';
                         const isFinished = hasProgress && (g.lastReadPage + 1 >= g.totalPages);
+                        const isSelected = MultiExportManager.selectedIds.has(g.id);
+                        const cardClickHandler = MultiExportManager.isSelectMode 
+                            ? `MultiExportManager.toggleSelectGallery(${g.id})` 
+                            : `UI.navigate('detail', ${g.id})`;
 
                         grid.innerHTML += `
-                            <div class="gallery-card bg-darkCard rounded overflow-hidden shadow cursor-pointer relative group" onclick="UI.navigate('detail', ${g.id})" data-gallery-id="${g.id}" data-cover-url="${coverUrl}" onmouseover="HoverPreview.start(parseInt(this.dataset.galleryId), this.dataset.coverUrl, this)" onmouseout="HoverPreview.stop()">
+                            <div class="gallery-card bg-darkCard rounded overflow-hidden shadow cursor-pointer relative group ${isSelected ? 'selected-for-export' : ''}" onclick="${cardClickHandler}" data-gallery-id="${g.id}" data-cover-url="${coverUrl}" ${!MultiExportManager.isSelectMode ? `onmouseover="HoverPreview.start(parseInt(this.dataset.galleryId), this.dataset.coverUrl, this)" onmouseout="HoverPreview.stop()"` : ''}>
                                 <div class="aspect-a4 overflow-hidden relative">
                                     <img src="${coverUrl}" class="cover-img w-full h-full object-cover" title="${g.title}">
+                                    ${MultiExportManager.isSelectMode ? `<div class="export-checkbox ${isSelected ? 'checked' : 'unchecked'}" title="Select for export"><i class="fa-solid fa-check"></i></div>` : ''}
                                     ${Grid.isEditMode ? `<button onclick="Grid.editItem(${g.id}, event)" class="absolute top-0 left-0 bg-blue-600 text-white w-8 h-8 flex items-center justify-center z-20 hover:bg-blue-700 transition shadow-md rounded-br-lg" data-i18n-title="edit_title"><i class="fa-solid fa-pen"></i></button>` : ''}
                                     ${Grid.isEditMode ? `<button onclick="Grid.deleteItem(${g.id}, event)" class="absolute top-0 right-0 bg-red-600 text-white w-8 h-8 flex items-center justify-center z-20 hover:bg-red-700 transition shadow-md rounded-bl-lg"><i class="fa-solid fa-xmark"></i></button>` : ''}
                                     ${Grid.isEditMode ? `<button onclick="Grid.createContinuation(${g.id}, event)" class="absolute bottom-0 right-0 bg-green-600 text-white w-8 h-8 flex items-center justify-center z-20 hover:bg-green-700 transition shadow-md rounded-tl-lg" data-i18n-title="create_continuation_title"><i class="fa-solid fa-plus"></i></button>` : ''}
                                     <div class="absolute top-2 right-2 flex flex-col gap-1 items-end">
                                         ${g.isFavorite ? '<div class="text-nRed text-lg shadow-black drop-shadow-md"><i class="fa-solid fa-heart"></i></div>' : ''}
-                                        ${g.isWatchLater ? '<div class="text-cyan-400 text-lg shadow-black drop-shadow-md cursor-pointer hover:opacity-80 transition" onclick="Grid.toggleWatchLaterCard(' + g.id + ', event)" title="' + T('added_to_watch_later') + '"><i class="fa-solid fa-eye"></i></div>' : '<div class="text-gray-400 text-lg shadow-black drop-shadow-md cursor-pointer hover:text-cyan-400 transition opacity-40 hover:opacity-100" onclick="Grid.toggleWatchLaterCard(' + g.id + ', event)" title="' + T('add_to_watch_later') + '"><i class="fa-solid fa-plus"></i><i class="fa-solid fa-eye"></i></div>'}
+                                        ${g.isWatchLater && !MultiExportManager.isSelectMode ? '<div class="text-cyan-400 text-lg shadow-black drop-shadow-md cursor-pointer hover:opacity-80 transition" onclick="Grid.toggleWatchLaterCard(' + g.id + ', event)" title="' + T('added_to_watch_later') + '"><i class="fa-solid fa-eye"></i></div>' : '<div class="text-gray-400 text-lg shadow-black drop-shadow-md cursor-pointer hover:text-cyan-400 transition opacity-40 hover:opacity-100" onclick="Grid.toggleWatchLaterCard(' + g.id + ', event)" title="' + T('add_to_watch_later') + '"><i class="fa-solid fa-plus"></i><i class="fa-solid fa-eye"></i></div>'}
                                         ${(hasProgress && !isFinished) ? '<div class="text-yellow-400 text-lg shadow-black drop-shadow-md"><i class="fa-solid fa-bookmark"></i></div>' : ''}
                                     </div>
                                     <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-2 pt-6" title="${g.title}">
@@ -6543,6 +6635,192 @@
                 }
             }
         }
+
+        // ================= MULTI-EXPORT MANAGER =================
+        const MultiExportManager = {
+            isSelectMode: false,
+            selectedIds: new Set(),
+            MAX_SINGLE_FILE_SIZE: 500, // in MB - maximum single file size before warning
+            MAX_BATCH_SIZE: 10, // number of galleries per batch download
+            
+            startSelectMode: function() {
+                this.isSelectMode = true;
+                this.selectedIds.clear();
+                document.getElementById('multiExportControls').classList.remove('hide');
+                document.getElementById('sortGrid').classList.add('hide');
+                document.getElementById('gridCount').classList.add('hide');
+                Grid.renderCurrentList();
+                Toast.info(T('export_queue_started'));
+            },
+            
+            cancelSelectMode: function() {
+                this.isSelectMode = false;
+                this.selectedIds.clear();
+                document.getElementById('multiExportControls').classList.add('hide');
+                document.getElementById('sortGrid').classList.remove('hide');
+                document.getElementById('gridCount').classList.remove('hide');
+                Grid.renderCurrentList();
+                Toast.info('ยกเลิกการเลือก');
+            },
+            
+            toggleSelectGallery: function(id) {
+                if (this.selectedIds.has(id)) {
+                    this.selectedIds.delete(id);
+                } else {
+                    this.selectedIds.add(id);
+                }
+                this.updateSelectCount();
+                Grid.renderCurrentList();
+            },
+            
+            updateSelectCount: function() {
+                const count = this.selectedIds.size;
+                const countText = T('export_selected_count', {count: count});
+                document.getElementById('exportSelectedCount').textContent = countText;
+            },
+            
+            exportSelected: async function() {
+                if (this.selectedIds.size === 0) {
+                    Toast.error(T('export_selected_none_error'));
+                    return;
+                }
+                
+                try {
+                    const selectedGalleries = Grid.allGalleries.filter(g => this.selectedIds.has(g.id));
+                    const totalSize = await this.estimateTotalSize(selectedGalleries);
+                    
+                    // Check if total size is too large - if so, ask for confirmation with batch info
+                    if (totalSize > 1000) { // 1GB threshold
+                        const confirmMsg = T('export_multiple_confirm', {
+                            count: selectedGalleries.length,
+                            size: Math.round(totalSize / 100) / 10
+                        });
+                        if (!confirm(confirmMsg)) return;
+                    }
+                    
+                    // Check if any single file is too large
+                    let hasTooLargeItems = false;
+                    for (const g of selectedGalleries) {
+                        const size = await this.estimateSingleGallerySize(g);
+                        if (size > this.MAX_SINGLE_FILE_SIZE) {
+                            hasTooLargeItems = true;
+                            break;
+                        }
+                    }
+                    
+                    if (hasTooLargeItems) {
+                        Toast.warn(`${T('export_file_too_large', {size: this.MAX_SINGLE_FILE_SIZE})} ${selectedGalleries.length} เรื่อง`);
+                        // But still continue with export
+                    }
+                    
+                    // Batch export
+                    if (selectedGalleries.length <= this.MAX_BATCH_SIZE) {
+                        // Single batch
+                        await this.exportBatch(selectedGalleries, 1, 1);
+                    } else {
+                        // Multiple batches
+                        const batchCount = Math.ceil(selectedGalleries.length / this.MAX_BATCH_SIZE);
+                        for (let i = 0; i < batchCount; i++) {
+                            const start = i * this.MAX_BATCH_SIZE;
+                            const end = Math.min(start + this.MAX_BATCH_SIZE, selectedGalleries.length);
+                            const batch = selectedGalleries.slice(start, end);
+                            await this.exportBatch(batch, i + 1, batchCount);
+                            
+                            // Add delay between batches for user experience
+                            if (i < batchCount - 1) {
+                                await new Promise(resolve => setTimeout(resolve, 500));
+                            }
+                        }
+                    }
+                    
+                    Toast.success('ส่งออกเสร็จสิ้น!');
+                    this.cancelSelectMode();
+                } catch (e) {
+                    Toast.error('เกิดข้อผิดพลาด: ' + e.message);
+                }
+            },
+            
+            exportBatch: async function(galleries, batchNum, totalBatches) {
+                const progress = Toast.progress(`ส่งออกชุด ${batchNum}/${totalBatches} (${galleries.length} เรื่อง)...`);
+                
+                try {
+                    const mainZip = new JSZip();
+                    
+                    for (let i = 0; i < galleries.length; i++) {
+                        const g = galleries[i];
+                        const pages = await db.pages.where('galleryId').equals(g.id).sortBy('order');
+                        const translationSets = await db.translationSets.where('galleryId').equals(g.id).toArray();
+                        
+                        // Create folder for gallery
+                        const galleryFolder = mainZip.folder(`gallery_${g.id}_${g.title.substring(0, 15)}`);
+                        
+                        // Add cover if exists
+                        if (g.coverBlob) {
+                            const coverBase64 = await DataManager.blobToBase64(g.coverBlob);
+                            const coverDataUrl = coverBase64.split(',')[1];
+                            galleryFolder.file('cover.base64', coverDataUrl);
+                        }
+                        
+                        // Add pages
+                        const pagesFolder = galleryFolder.folder('pages');
+                        for (let j = 0; j < pages.length; j++) {
+                            const p = pages[j];
+                            const pageBase64 = await DataManager.blobToBase64(p.imageBlob);
+                            const pageDataUrl = pageBase64.split(',')[1];
+                            pagesFolder.file(`${p.order}.base64`, pageDataUrl);
+                        }
+                        
+                        // Add metadata
+                        const metadata = {
+                            type: 'single_gallery',
+                            gallery: {
+                                ...g,
+                                coverBlob: g.coverBlob ? 'cover.base64' : null
+                            },
+                            pages: pages.map(p => ({
+                                ...p,
+                                imageBlob: `pages/${p.order}.base64`,
+                                translations: p.translations || [],
+                                translationSets: p.translationSets || []
+                            })),
+                            translationSets: translationSets
+                        };
+                        galleryFolder.file('metadata.json', JSON.stringify(metadata, null, 2));
+                        
+                        progress.update(((i + 1) / galleries.length) * 100);
+                    }
+                    
+                    // Generate and download ZIP
+                    const zipBlob = await mainZip.generateAsync({type: 'blob'});
+                    const url = URL.createObjectURL(zipBlob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `UGal-export-batch${batchNum}-${Date.now()}.zip`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    
+                    progress.complete(`ส่งออกชุด ${batchNum} สำเร็จ!`);
+                } catch(e) {
+                    if (Toast.activeProgressToast) Toast.activeProgressToast.querySelector('.toast-icon').textContent = '✕';
+                    Toast.error('เกิดข้อผิดพลาดในการส่งออก: ' + e.message);
+                }
+            },
+            
+            estimateTotalSize: async function(galleries) {
+                let total = 0;
+                for (const g of galleries) {
+                    total += await this.estimateSingleGallerySize(g);
+                }
+                return total;
+            },
+            
+            estimateSingleGallerySize: async function(gallery) {
+                // Rough estimate in MB: cover (~1-5MB) + pages (~0.5-2MB each) + metadata (~0.1MB)
+                const pages = await db.pages.where('galleryId').equals(gallery.id).count();
+                const estimatedSize = (gallery.coverBlob ? 2 : 0) + (pages * 1) + 0.1;
+                return estimatedSize;
+            }
+        };
 
         window.onload = () => {
             PDFConverter.init();
